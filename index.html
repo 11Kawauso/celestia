@@ -20,10 +20,7 @@
 <div class="wrap">
   <header class="top">
     <div class="brand">セレスティア</div>
-    <div class="topend">
-      <div class="topdate" id="topdate"></div>
-      <button class="helpbtn" id="helpBtn" aria-pressed="false" aria-label="説明を見る" hidden>?</button>
-    </div>
+    <div class="topdate" id="topdate"></div>
   </header>
 
   <main>
@@ -87,16 +84,18 @@
         <div class="grid" id="dowRow"></div>
         <div class="grid" id="calGrid" style="margin-top:4px"></div>
       </div>
-      <div class="note">枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div>
+      <div class="helprow"><button class="helpbtn" data-act="help" data-help="n-cal" aria-controls="n-cal" aria-expanded="false" aria-label="説明を見る">?</button></div>
+      <div class="note helptext" id="n-cal">枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div>
     </section>
 
     <!-- GOALS -->
     <section class="view" id="v-goal">
       <div class="sec">
         <div class="sechead">
-          <div class="sectitle">長期目標</div>
+          <div class="sectitle">長期目標<button class="helpbtn" data-act="help" data-help="n-goal" aria-controls="n-goal" aria-expanded="false" aria-label="説明を見る">?</button></div>
           <button class="addbtn" id="addGoal">＋ 追加</button>
         </div>
+        <div class="note helptext" id="n-goal">時間のかかる目標を書いて、小さなステップに分けます。ステップを押すと進みぐあいが伸びます。ここではEXPは増えません。日々の積み重ねはミッションで。</div>
         <div id="goalList"></div>
       </div>
 
@@ -105,36 +104,37 @@
         <div id="goalDone"></div>
       </div>
 
-      <div class="note">時間のかかる目標を書いて、小さなステップに分けます。ステップを押すと進みぐあいが伸びます。ここではEXPは増えません。日々の積み重ねはミッションで。</div>
     </section>
 
     <!-- SETTINGS -->
     <section class="view" id="v-set">
       <div class="card">
-        <div class="lab">あなたの名前</div>
+        <div class="lab">あなたの名前<button class="helpbtn" data-act="help" data-help="n-user" aria-controls="n-user" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <input class="field" id="userName" placeholder="呼ばれたい名前" maxlength="20" enterkeyhint="done">
-        <div class="note">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div>
+        <div class="note helptext" id="n-user">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div>
       </div>
 
       <div class="card">
-        <div class="lab">見た目</div>
+        <div class="lab">見た目<button class="helpbtn" data-act="help" data-help="n-theme" aria-controls="n-theme" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <div class="pills" id="themePills">
           <button class="pill" data-t="auto">自動</button>
           <button class="pill" data-t="dark">夜（紺）</button>
           <button class="pill" data-t="light">昼（白）</button>
         </div>
-        <div class="note">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div>
-      </div>
-
-      <div class="card helponly">
-        <div class="lab">ホーム画面に置く</div>
-        <div class="note">Safariでこのページを開く → 下の<b>共有ボタン</b> → <b>ホーム画面に追加</b>。次からはアプリのように全画面で開きます。中身を更新しても置き直しは不要です。</div>
-        <div class="note" id="swState">オフライン対応：確認中…</div>
+        <div class="note helptext" id="n-theme">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div>
       </div>
 
       <div class="card">
-        <div class="lab">バックアップ</div>
-        <div class="note">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div>
+        <div class="lab">ホーム画面に置く<button class="helpbtn" data-act="help" data-help="n-install" aria-controls="n-install" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="helptext helpgroup" id="n-install">
+        <div class="note">Safariでこのページを開く → 下の<b>共有ボタン</b> → <b>ホーム画面に追加</b>。次からはアプリのように全画面で開きます。中身を更新しても置き直しは不要です。</div>
+        <div class="note" id="swState">オフライン対応：確認中…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="lab">バックアップ<button class="helpbtn" data-act="help" data-help="n-backup" aria-controls="n-backup" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="note helptext" id="n-backup">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div>
         <textarea class="field" id="backup" readonly></textarea>
         <div class="btnrow">
           <button class="btn" id="copyBk">コピー</button>
