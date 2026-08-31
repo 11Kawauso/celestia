@@ -85,7 +85,7 @@
         <div class="grid" id="calGrid" style="margin-top:4px"></div>
       </div>
       <div class="helprow"><button class="helpbtn" data-act="help" data-help="n-cal" aria-controls="n-cal" aria-expanded="false" aria-label="説明を見る">?</button></div>
-      <div class="note helptext" id="n-cal">枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div>
+      <div class="helptext" id="n-cal"><div class="note">枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div></div>
     </section>
 
     <!-- GOALS -->
@@ -95,7 +95,7 @@
           <div class="sectitle">長期目標<button class="helpbtn" data-act="help" data-help="n-goal" aria-controls="n-goal" aria-expanded="false" aria-label="説明を見る">?</button></div>
           <button class="addbtn" id="addGoal">＋ 追加</button>
         </div>
-        <div class="note helptext" id="n-goal">時間のかかる目標を書いて、小さなステップに分けます。ステップを押すと進みぐあいが伸びます。ここではEXPは増えません。日々の積み重ねはミッションで。</div>
+        <div class="helptext" id="n-goal"><div class="note">時間のかかる目標を書いて、小さなステップに分けます。ステップを押すと進みぐあいが伸びます。ここではEXPは増えません。日々の積み重ねはミッションで。</div></div>
         <div id="goalList"></div>
       </div>
 
@@ -111,7 +111,7 @@
       <div class="card">
         <div class="lab">あなたの名前<button class="helpbtn" data-act="help" data-help="n-user" aria-controls="n-user" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <input class="field" id="userName" placeholder="呼ばれたい名前" maxlength="20" enterkeyhint="done">
-        <div class="note helptext" id="n-user">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div>
+        <div class="helptext" id="n-user"><div class="note">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div></div>
       </div>
 
       <div class="card">
@@ -121,20 +121,12 @@
           <button class="pill" data-t="dark">夜（紺）</button>
           <button class="pill" data-t="light">昼（白）</button>
         </div>
-        <div class="note helptext" id="n-theme">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div>
-      </div>
-
-      <div class="card">
-        <div class="lab">ホーム画面に置く<button class="helpbtn" data-act="help" data-help="n-install" aria-controls="n-install" aria-expanded="false" aria-label="説明を見る">?</button></div>
-        <div class="helptext helpgroup" id="n-install">
-        <div class="note">Safariでこのページを開く → 下の<b>共有ボタン</b> → <b>ホーム画面に追加</b>。次からはアプリのように全画面で開きます。中身を更新しても置き直しは不要です。</div>
-        <div class="note" id="swState">オフライン対応：確認中…</div>
-        </div>
+        <div class="helptext" id="n-theme"><div class="note">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div></div>
       </div>
 
       <div class="card">
         <div class="lab">バックアップ<button class="helpbtn" data-act="help" data-help="n-backup" aria-controls="n-backup" aria-expanded="false" aria-label="説明を見る">?</button></div>
-        <div class="note helptext" id="n-backup">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div>
+        <div class="helptext" id="n-backup"><div class="note">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div></div>
         <textarea class="field" id="backup" readonly></textarea>
         <div class="btnrow">
           <button class="btn" id="copyBk">コピー</button>
@@ -256,6 +248,13 @@
     </div>
     <button class="btn danger" id="gDelete" hidden>この目標を消す</button>
   </div>
+</div>
+
+<!-- help popover -->
+<div class="popveil" id="popVeil" hidden></div>
+<div class="pop" id="pop" role="tooltip" hidden>
+  <div class="popbody" id="popBody"></div>
+  <div class="poparrow" id="popArrow"></div>
 </div>
 
 <div class="levelup" id="levelup">

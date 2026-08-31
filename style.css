@@ -64,11 +64,25 @@ button{background:none;border:none;cursor:pointer}
   border-color:transparent;color:#fff;
   background:linear-gradient(135deg,var(--dusk),var(--dawn));
 }
-.helptext{display:none}
-.helptext.on{display:block}
-/* 説明が2つ入っているところ用 */
-.helpgroup.on{display:flex;flex-direction:column;gap:9px}
 .helprow{display:flex;justify-content:flex-end;padding:0 2px}
+/* 説明の文面はここに置いておくだけ。表示は下の小窓が受けもつ。 */
+.helptext{display:none}
+
+/* 「?」を押すと出る小窓。基本はボタンの上、入らないときだけ下に出る。 */
+.popveil{position:fixed;inset:0;z-index:44}
+.pop{
+  position:fixed;z-index:45;left:0;top:0;
+  background:var(--bg2);border:1px solid var(--line);border-radius:12px;
+  padding:11px 13px;box-shadow:0 8px 30px rgba(10,8,20,.3);
+}
+.popbody{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:9px}
+.popbody .note{font-size:12.5px}
+.poparrow{
+  position:absolute;width:10px;height:10px;margin-left:-5px;
+  background:var(--bg2);border:1px solid var(--line);transform:rotate(45deg);
+}
+.pop:not(.below) .poparrow{bottom:-6px;border-top:0;border-left:0}
+.pop.below .poparrow{top:-6px;border-bottom:0;border-right:0}
 main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .view{display:none;flex-direction:column;gap:18px}
 .view.on{display:flex}

@@ -441,11 +441,7 @@ document.addEventListener("click", e => {
   }
   if (act === "day") { openDay(b.dataset.k); }
   if (act === "help") {
-    const t = document.getElementById(b.dataset.help); if (!t) return;
-    const on = t.classList.toggle("on");
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-expanded", on ? "true" : "false");
-    b.setAttribute("aria-label", on ? "説明をかくす" : "説明を見る");
+    if (popFor === b) closePop(); else openPop(b);
   }
 });
 function flash(el) {
@@ -453,10 +449,75 @@ function flash(el) {
   row.animate([{ transform: "translateX(0)" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "translateX(0)" }], { duration: 260 });
 }
 
+/* ---------- help popover ---------- */
+/* 説明はその場で開かず、最前面の小窓に出す。
+   基本はボタンの上。上に入りきらないときだけ下に回す。 */
+let popFor = null;
+const POP_EDGE = 12;   // 画面の端からあけておく余白
+const POP_GAP = 9;     // ボタンとの間隔
+
+function openPop(btn) {
+  const src = document.getElementById(btn.dataset.help); if (!src) return;
+  const body = $("#popBody");
+  body.innerHTML = src.innerHTML;
+  // 複製した中身の id は落とす。元の要素と重複させないため。
+  body.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
+  $("#pop").hidden = false; $("#popVeil").hidden = false;
+  if (popFor) markPop(popFor, false);
+  popFor = btn; markPop(btn, true);
+  placePop();
+}
+function closePop() {
+  if (!popFor) return;
+  markPop(popFor, false); popFor = null;
+  $("#pop").hidden = true; $("#popVeil").hidden = true;
+}
+function markPop(btn, on) {
+  btn.classList.toggle("on", on);
+  btn.setAttribute("aria-expanded", on ? "true" : "false");
+  btn.setAttribute("aria-label", on ? "説明をかくす" : "説明を見る");
+}
+function placePop() {
+  if (!popFor) return;
+  const pop = $("#pop"), r = popFor.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+
+  // 上下の限界は、ヘッダーと下タブの実際の位置から取る（iPhoneのノッチぶん高さが変わるため）。
+  const lim = {
+    top: $(".top").getBoundingClientRect().bottom + 6,
+    bottom: $(".nav").getBoundingClientRect().top - 6
+  };
+  // ボタンがヘッダーの裏や下タブの裏へ流れていったら閉じる
+  if (r.bottom < lim.top || r.top > lim.bottom) { closePop(); return; }
+
+  // 幅を測る前に左端へ戻す。右寄りのままだと折り返し幅が変わって測り間違える。
+  pop.style.maxWidth = Math.min(320, vw - POP_EDGE * 2) + "px";
+  pop.style.left = "0px";
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+
+  // 横：ボタンの中心にそろえ、はみ出すぶんだけ画面内へ寄せる
+  const left = Math.max(POP_EDGE, Math.min(r.left + r.width / 2 - w / 2, vw - POP_EDGE - w));
+  // 縦：上に入るなら上、入らなければ下
+  const above = r.top - POP_GAP - h >= lim.top;
+
+  pop.style.left = left + "px";
+  pop.style.top = Math.max(lim.top, Math.min(
+    above ? r.top - POP_GAP - h : r.bottom + POP_GAP, lim.bottom - h)) + "px";
+  pop.classList.toggle("below", !above);
+  // 矢印はボタンの真ん中を指す
+  $("#popArrow").style.left =
+    Math.max(13, Math.min(r.left + r.width / 2 - left, w - 13)) + "px";
+}
+$("#popVeil").addEventListener("click", closePop);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+window.addEventListener("resize", placePop);
+window.addEventListener("scroll", placePop, true);
+
 /* ---------- tabs ---------- */
 $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
+  closePop();
   window.scrollTo(0, 0);
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
@@ -598,12 +659,9 @@ setInterval(() => {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
 
 /* ---------- service worker ---------- */
-(function () {
-  const s = $("#swState");
-  if (!("serviceWorker" in navigator)) { s.textContent = "オフライン対応：この環境では使えません"; return; }
-  if (location.protocol === "file:") { s.textContent = "オフライン対応：ファイルを直接開いた状態では働きません（サーバー上でのみ有効）"; return; }
-  navigator.serviceWorker.register("sw.js").then(reg => {
-    s.textContent = "オフライン対応：有効（電波がなくても開けます）";
-    reg.update();
-  }).catch(() => { s.textContent = "オフライン対応：登録できませんでした"; });
-})();
+/* オフラインで開けるようにする。file: で直接開いたときは働かないので何もしない。 */
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register("sw.js")
+    .then(reg => reg.update())
+    .catch(() => {});
+}
