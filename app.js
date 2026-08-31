@@ -9,6 +9,9 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
 /* キャラクターは全ユーザー共通で固定。ユーザーが変えられるのは自分の呼ばれ方だけ。 */
 const CHARA = "セレスティア";
+/* キャラの絵。ファイルを置いたらここにパスを入れる（例："icons/celestia.png"）。
+   空のあいだは「セ」の仮枠が出る。 */
+const CHARA_IMG = "";
 
 /* ---------- state ---------- */
 function seed() {
@@ -273,6 +276,28 @@ function holidaysOf(y) {
 }
 const holidayName = d => holidaysOf(d.getFullYear())[(d.getMonth() + 1) + "-" + d.getDate()] || "";
 
+/* ---------- セリフ ---------- */
+/* 早起きミッションの状態と時間帯で言うことを変える。
+   文面を変えたいときはこの関数だけ直せばよい。 */
+function speechText(now) {
+  const you = (st.user || "").trim();
+  const call = you ? you + "、" : "";
+  const w = st.missions.find(m => m.type === "wake");
+  const cs = w ? claimState(w, now, false) : "lock";
+  const h = now.getHours();
+  const left = st.missions
+    .filter(m => m.days.includes(now.getDay()))
+    .filter(m => claimState(m, now, false) === "ready").length;
+  const more = left ? "受け取れる報酬が " + left + " つ残っているよ。" : "";
+
+  if (cs === "lock")  return call + "こんばんは。まだ夜だね、ゆっくり休んで。";
+  if (cs === "ready") return call + "おはよう。報酬を受け取っていってね。";
+  if (cs === "done")  return call + "おはよう。今日もちゃんと起きられたね。" + more;
+  if (h < 12) return call + "おはよう。明日はもう少し早く会えるかな。" + more;
+  if (h < 18) return call + "こんにちは。今日はどんな一日？" + more;
+  return call + "こんばんは。明日の朝、また待ってるね。" + more;
+}
+
 /* ---------- render ---------- */
 function render() {
   const now = new Date(), tk = keyOf(now);
@@ -290,6 +315,12 @@ function render() {
   $("#ringfill").setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
   $("#expnow").textContent = c.exp + " / " + nd + " EXP";
   $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
+
+  // キャラの絵とセリフ
+  $("#portrait").innerHTML = CHARA_IMG
+    ? '<img src="' + esc(CHARA_IMG) + '" alt="' + CHARA + '">'
+    : '<span class="rune">' + CHARA[0] + "</span>";
+  $("#speech").textContent = speechText(now);
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
