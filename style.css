@@ -4,6 +4,7 @@
   --ink:#121734; --ink2:#4f5779; --ink3:#838ab0;
   --night:#1d3382; --dusk:#2c4bab; --dawn:#a8791f;
   --ok:#2f8468; --bad:#b8534f;
+  --sun:#b8534f; --sat:#1f52c9;
   --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
   --r:14px;
 }
@@ -13,6 +14,7 @@
     --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
     --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
     --ok:#4fb894; --bad:#e0797a;
+    --sun:#e0797a; --sat:#4f7ff0;
     --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
   }
 }
@@ -21,6 +23,7 @@
   --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
   --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
   --ok:#4fb894; --bad:#e0797a;
+  --sun:#e0797a; --sat:#4f7ff0;
   --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
 }
 
@@ -172,7 +175,7 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .navb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .dow{text-align:center;font-size:10.5px;color:var(--ink3);padding:4px 0;letter-spacing:.05em}
-.dow.s{color:var(--night)} .dow.n{color:var(--dusk)}
+.dow.sun{color:var(--sun)} .dow.sat{color:var(--sat)}
 .cell{
   aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
@@ -180,6 +183,8 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .cell.pad{background:transparent;border-color:transparent}
 .cell.now{border-color:var(--dawn);box-shadow:0 0 0 1px var(--dawn) inset}
 .cell .d{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.cell .d.sun{color:var(--sun)}
+.cell .d.sat{color:var(--sat)}
 .cell.now .d{color:var(--dawn);font-weight:700}
 .cell .dots{display:flex;gap:3px;align-items:center;height:4px}
 .cell .dot{width:4px;height:4px;border-radius:50%;background:var(--night)}

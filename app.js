@@ -140,6 +140,63 @@ function daysLabel(m) {
 }
 const sortKey = m => (m.mode && m.time ? m.time : "99:99");
 
+/* ---------- 祝日 ---------- */
+/* 国民の祝日・振替休日・国民の休日を出す。外部データは使わない。
+   春分と秋分は近似式で、1980〜2099年のあいだは実際の暦と一致する。
+   2020・2021年の五輪にともなう臨時の移動は入れていない。 */
+const holCache = {};
+function holidaysOf(y) {
+  if (holCache[y]) return holCache[y];
+  const h = {}, key = (m, d) => m + "-" + d;
+  const put = (m, d, name) => { h[key(m, d)] = name; };
+  const nthMon = (m, n) => 1 + ((8 - new Date(y, m - 1, 1).getDay()) % 7) + (n - 1) * 7;
+  const eq = (a) => Math.floor(a + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+
+  put(1, 1, "元日");
+  put(1, nthMon(1, 2), "成人の日");
+  put(2, 11, "建国記念の日");
+  put(2, 23, "天皇誕生日");
+  put(3, eq(20.8431), "春分の日");
+  put(4, 29, "昭和の日");
+  put(5, 3, "憲法記念日");
+  put(5, 4, "みどりの日");
+  put(5, 5, "こどもの日");
+  put(7, nthMon(7, 3), "海の日");
+  put(8, 11, "山の日");
+  put(9, nthMon(9, 3), "敬老の日");
+  put(9, eq(23.2488), "秋分の日");
+  put(10, nthMon(10, 2), "スポーツの日");
+  put(11, 3, "文化の日");
+  put(11, 23, "勤労感謝の日");
+
+  const base = Object.assign({}, h);
+  const each = fn => {
+    const d = new Date(y, 0, 1);
+    while (d.getFullYear() === y) { fn(d); d.setDate(d.getDate() + 1); }
+  };
+  // 国民の休日：祝日にはさまれた平日（9月の敬老の日と秋分の日のあいだなど）
+  each(d => {
+    const m = d.getMonth() + 1, dd = d.getDate();
+    if (base[key(m, dd)] || d.getDay() === 0) return;
+    const p = new Date(y, d.getMonth(), dd - 1), n = new Date(y, d.getMonth(), dd + 1);
+    if (base[key(p.getMonth() + 1, p.getDate())] && base[key(n.getMonth() + 1, n.getDate())])
+      put(m, dd, "国民の休日");
+  });
+  // 振替休日：日曜と重なった祝日のぶんを、次に空いている日へ送る
+  const sub = [];
+  each(d => {
+    if (d.getDay() !== 0 || !h[key(d.getMonth() + 1, d.getDate())]) return;
+    const n = new Date(y, d.getMonth(), d.getDate() + 1);
+    while (h[key(n.getMonth() + 1, n.getDate())]) n.setDate(n.getDate() + 1);
+    if (n.getFullYear() === y) sub.push([n.getMonth() + 1, n.getDate()]);
+  });
+  sub.forEach(x => put(x[0], x[1], "振替休日"));
+
+  holCache[y] = h;
+  return h;
+}
+const holidayName = d => holidaysOf(d.getFullYear())[(d.getMonth() + 1) + "-" + d.getDate()] || "";
+
 /* ---------- render ---------- */
 function render() {
   const now = new Date(), tk = keyOf(now);
@@ -272,7 +329,7 @@ let calY, calM;
 function renderCal() {
   $("#calmon").textContent = calY + "年 " + (calM + 1) + "月";
   $("#dowRow").innerHTML = DOW.map((d, i) =>
-    '<div class="dow ' + (i === 0 ? "n" : i === 6 ? "s" : "") + '">' + d + "</div>").join("");
+    '<div class="dow ' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + d + "</div>").join("");
   const first = new Date(calY, calM, 1), last = new Date(calY, calM + 1, 0);
   const tk = keyOf(new Date());
   let html = "";
@@ -284,8 +341,11 @@ function renderCal() {
     const ratio = sched.length ? doneN / sched.length : 0;
     const hasEv = (st.events[k] || []).length > 0;
     const hasGoal = st.goals.some(g => !g.done && g.due === k);
+    // 日曜と祝日は赤、土曜は青。今日はこの上から金色になる。
+    const dw = d.getDay();
+    const dc = (dw === 0 || holidayName(d)) ? " sun" : dw === 6 ? " sat" : "";
     html += '<button class="cell' + (k === tk ? " now" : "") + '" data-act="day" data-k="' + k + '">' +
-      '<span class="d">' + day + "</span>" +
+      '<span class="d' + dc + '">' + day + "</span>" +
       (hasEv || hasGoal ? '<span class="dots">' +
         (hasEv ? '<span class="dot"></span>' : "") +
         (hasGoal ? '<span class="dot due"></span>' : "") + "</span>" : "") +
