@@ -4,7 +4,7 @@
   --ink:#121734; --ink2:#4f5779; --ink3:#838ab0;
   --night:#1d3382; --dusk:#2c4bab; --dawn:#a8791f;
   --ok:#2f8468; --bad:#b8534f;
-  --sun:#b8534f; --sat:#1f52c9;
+  --sun:#b8534f; --sat:#1f52c9; --aqua:#1d8ab0;
   --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
   --r:14px;
 }
@@ -14,7 +14,7 @@
     --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
     --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
     --ok:#4fb894; --bad:#e0797a;
-    --sun:#e0797a; --sat:#4f7ff0;
+    --sun:#e0797a; --sat:#4f7ff0; --aqua:#48c0e0;
     --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
   }
 }
@@ -23,7 +23,7 @@
   --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
   --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
   --ok:#4fb894; --bad:#e0797a;
-  --sun:#e0797a; --sat:#4f7ff0;
+  --sun:#e0797a; --sat:#4f7ff0; --aqua:#48c0e0;
   --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
 }
 
@@ -140,11 +140,24 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 
 /* ---- mission row ---- */
 .row{
-  display:flex;align-items:center;gap:12px;background:var(--bg2);
-  border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:9px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:var(--r);padding:11px 11px;box-shadow:var(--shadow);
 }
 .row.done{background:color-mix(in srgb,var(--ok) 9%,var(--bg2));border-color:color-mix(in srgb,var(--ok) 26%,var(--line))}
+.row.clear{border-color:var(--ok)}
 .row.locked{opacity:.55}
+
+/* 報酬の受け取りボタン。
+   灰色＝未クリア ／ 水色＝受け取れる ／ 緑＝受け取り済み ／ 灰色＋赤枠＝時間切れ */
+.claim{
+  flex:none;width:104px;padding:9px 4px;border-radius:10px;text-align:center;
+  border:1px solid var(--line);background:var(--bg3);color:var(--ink3);
+  font-size:11.5px;font-weight:700;line-height:1.2;letter-spacing:.02em;
+}
+.claim:active{transform:scale(.97)}
+.claim.ready{background:var(--aqua);border-color:transparent;color:#fff}
+.claim.done{background:var(--ok);border-color:transparent;color:#fff}
+.claim.late{border-color:var(--bad);color:var(--bad)}
 .check{
   width:32px;height:32px;flex:none;border-radius:50%;border:2px solid var(--line);
   display:grid;place-items:center;transition:transform .12s;
@@ -162,8 +175,8 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .chip.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
 .chip.fire{color:var(--dusk);background:color-mix(in srgb,var(--dusk) 13%,transparent)}
 .chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
-.expbadge{font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums;flex:none;letter-spacing:.02em}
-.edit{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--ink3)}
+.expbadge{font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums;flex:none;letter-spacing:0;white-space:nowrap}
+.edit{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;color:var(--ink3)}
 .edit:active{background:var(--bg3)}
 .edit svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
@@ -256,6 +269,9 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--ink3);font-size:10px;letter-spacing:.04em}
 .tab svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--dawn)}
+
+#mFree{display:flex;flex-direction:column;gap:13px}
+.pill .pexp{margin-left:6px;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 
 /* ---- sheet ---- */
 .scrim{position:fixed;inset:0;z-index:40;background:rgba(10,8,20,.5);opacity:0;pointer-events:none;transition:opacity .22s}

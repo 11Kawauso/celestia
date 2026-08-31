@@ -17,7 +17,7 @@ function seed() {
     chara: { level: 1, exp: 0 },
     user: "",
     missions: [
-      { id: uid(), title: "7時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "07:00" }
+      wakeMission(uid(), WAKE_DEFAULT)
     ],
     goals: [
       { id: uid(), title: "アプリを完成させる", due: "", done: false, doneAt: "",
@@ -33,6 +33,25 @@ function seed() {
 /* 保存データを今の形にそろえる。古い版から来たものも、手で書きかえられたものも
    ここを通る。中身は捨てずに、型だけを直す。ここで数値・日付・時刻をきちんと
    絞っておくことが、描画側が変なものを掴まない一番の守りになる。 */
+/* 早起きミッションは4つの時刻からえらぶ。EXPは時刻で決まり、早いほど多い。
+   タイトル・曜日・時間のしばりも時刻から自動で決まるので、保存時に組み立てる。 */
+const WAKE = [
+  { time: "06:00", exp: 30 },
+  { time: "07:00", exp: 25 },
+  { time: "08:00", exp: 20 },
+  { time: "09:00", exp: 15 }
+];
+const WAKE_DEFAULT = "07:00";
+const wakeAt = t => WAKE.find(w => w.time === t) || WAKE.find(w => w.time === WAKE_DEFAULT);
+const wakeHour = t => +t.split(":")[0];
+const wakeTitle = t => wakeHour(t) + "時に起きる";
+/* 早起きの形にそろえた1件を作る */
+function wakeMission(id, time) {
+  const w = wakeAt(time);
+  return { id: id, type: "wake", title: wakeTitle(w.time), exp: w.exp,
+           days: [0,1,2,3,4,5,6], mode: "before", time: w.time };
+}
+
 const asStr = v => (typeof v === "string" ? v : "");
 const asNum = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
 const asArr = v => (Array.isArray(v) ? v : []);
@@ -52,9 +71,12 @@ function normalize(o) {
 
   o.missions = asArr(o.missions).map(x => {
     const m = asObj(x);
+    // 早起きは中身をすべて時刻から作り直す。手で書きかえられてもずれない
+    if (m.type === "wake") return wakeMission(asStr(m.id) || uid(), asStr(m.time));
     const mode = (m.mode === "before" || m.mode === "after") ? m.mode : "";
     return {
       id: asStr(m.id) || uid(),
+      type: "free",
       title: asStr(m.title),
       exp: Math.max(0, Math.floor(asNum(m.exp, 10))),
       days: asArr(m.days).map(d => Math.floor(asNum(d, -1))).filter(d => d >= 0 && d <= 6),
@@ -155,15 +177,26 @@ function toggleDone(id, k, on) {
   if (!on && i >= 0) arr.splice(i, 1);
   if (!arr.length) delete st.log[k];
 }
-function windowState(m, now) {
-  if (!m.mode || !m.time) return "ok";
-  const p = m.time.split(":");
-  const t = (+p[0]) * 60 + (+p[1]);
+const CLAIM_FROM = 5 * 60;   // 早起きミッションの受け取りは朝5時から
+const hm = s => (+s.split(":")[0]) * 60 + (+s.split(":")[1]);
+
+/* 長方形ボタンの状態を決める。
+   done = 受け取り済み ／ ready = いま受け取れる ／ late = 時間切れ ／ lock = まだ受け取れない */
+function claimState(m, now, otherDay) {
+  if (doneOn(m.id, keyOf(now))) return "done";
+  if (otherDay) return "lock";
   const cur = now.getHours() * 60 + now.getMinutes();
-  if (m.mode === "before") return cur <= t ? "ok" : "late";
-  if (m.mode === "after") return cur >= t ? "ok" : "early";
-  return "ok";
+  if (m.mode === "before" && m.time) {
+    if (cur >= hm(m.time)) return "late";              // 指定時刻を過ぎた
+    if (m.type !== "wake") return "ready";             // 朝5時のしばりは早起きだけ
+    return cur >= CLAIM_FROM ? "ready" : "lock";       // 早起きは朝5時から
+  }
+  if (m.mode === "after" && m.time) {
+    return cur >= hm(m.time) ? "ready" : "lock";
+  }
+  return "ready";   // 時間のしばりが無いものは、やったかどうかを自己申告で受け取る
 }
+const CLAIM_LABEL = { done: "受け取り済み", ready: "報酬を受け取る", late: "時間切れ", lock: "未クリア" };
 function streakOf(m) {
   const d = new Date();
   if (!doneOn(m.id, keyOf(d))) d.setDate(d.getDate() - 1);
@@ -295,24 +328,25 @@ function render() {
 }
 
 function missionRow(m, tk, now, dim) {
-  const done = doneOn(m.id, tk);
-  const w = dim ? "ok" : windowState(m, now);
+  const cs = claimState(m, now, dim);
   const s = streakOf(m);
   const chips = [];
   chips.push('<span class="chip">' + esc(daysLabel(m)) + "</span>");
   if (m.mode && m.time) {
     const lab = m.mode === "before" ? "〜" + m.time + " まで" : m.time + " から";
-    const cls = (!done && w === "late") ? "chip late" : "chip time";
-    chips.push('<span class="' + cls + '">' + esc(lab) + (!done && w === "late" ? "・時間切れ" : "") + "</span>");
+    chips.push('<span class="chip ' + (cs === "late" ? "late" : "time") + '">' + esc(lab) + "</span>");
   }
   if (s > 1) chips.push('<span class="chip fire">' + s + "日れんぞく</span>");
-  const cls = "row" + (done ? " done" : "") + ((!done && w !== "ok") || dim ? " locked" : "");
-  return '<div class="' + cls + '" data-m="' + m.id + '">' +
-    '<button class="check" data-act="toggle" data-id="' + esc(m.id) + '" aria-label="達成"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' +
+
+  // 受け取れる状態と受け取り済みは、枠を緑にする
+  const cls = "row" + (cs === "ready" || cs === "done" ? " clear" : "") + (dim ? " locked" : "");
+  return '<div class="' + cls + '" data-m="' + esc(m.id) + '">' +
+    '<button class="edit" data-act="edit" data-id="' + esc(m.id) + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
     '<div class="rowbody"><div class="rowtitle">' + esc(m.title) + "</div>" +
     '<div class="chips">' + chips.join("") + "</div></div>" +
-    '<span class="expbadge">+' + esc(m.exp) + "</span>" +
-    '<button class="edit" data-act="edit" data-id="' + esc(m.id) + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
+    '<span class="expbadge">EXP+' + esc(m.exp) + "</span>" +
+    '<button class="claim ' + cs + '" data-act="claim" data-id="' + esc(m.id) + '">' +
+    CLAIM_LABEL[cs] + "</button>" +
     "</div>";
 }
 
@@ -412,7 +446,20 @@ $("#scrim").addEventListener("click", closeSheets);
 /* mission editor */
 let editing = null, draft = null;
 $("#mDays").innerHTML = DOW.map((d, i) => '<button class="day" data-d="' + i + '">' + d + "</button>").join("");
+$("#mWakeTime").innerHTML = WAKE.map(w =>
+  '<button class="pill" data-t="' + w.time + '">' + wakeHour(w.time) +
+  '時<span class="pexp">EXP+' + w.exp + "</span></button>").join("");
+
 function paintDraft() {
+  const wake = draft.type === "wake";
+  $$("#mType .pill").forEach(p => p.classList.toggle("on", p.dataset.k === draft.type));
+  $("#mWake").hidden = !wake;
+  $("#mFree").hidden = wake;
+  if (wake) {
+    draft.wakeTime = wakeAt(draft.wakeTime).time;
+    $$("#mWakeTime .pill").forEach(p => p.classList.toggle("on", p.dataset.t === draft.wakeTime));
+    return;
+  }
   $("#mName").value = draft.title;
   $$("#mExp .pill").forEach(p => p.classList.toggle("on", +p.dataset.e === draft.exp));
   $$("#mDays .day").forEach(p => p.classList.toggle("on", draft.days.includes(+p.dataset.d)));
@@ -422,12 +469,27 @@ function paintDraft() {
 }
 function openMission(m) {
   editing = m ? m.id : null;
-  draft = m ? { title: m.title, exp: m.exp, days: m.days.slice(), mode: m.mode || "", time: m.time || "" }
-            : { title: "", exp: 20, days: [0,1,2,3,4,5,6], mode: "", time: "" };
-  $("#mTitle").textContent = m ? "ミッションを編集" : "ミッションを追加";
+  draft = m
+    ? { type: m.type, title: m.title, exp: m.exp, days: m.days.slice(),
+        mode: m.mode || "", time: m.time || "",
+        wakeTime: m.type === "wake" ? m.time : WAKE_DEFAULT }
+    : { type: "wake", title: "", exp: 20, days: [0,1,2,3,4,5,6],
+        mode: "", time: "", wakeTime: WAKE_DEFAULT };
+  $("#mTitle").textContent = m
+    ? (m.type === "wake" ? "早起きミッションを編集" : "ミッションを編集")
+    : "ミッションを追加";
+  $("#mTypeRow").hidden = !!m;   // 種類はあとから変えない
   $("#mDelete").hidden = !m;
   paintDraft(); openSheet("#sheetM");
 }
+$("#mType").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  draft.type = b.dataset.k; paintDraft();
+});
+$("#mWakeTime").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  draft.wakeTime = b.dataset.t; paintDraft();
+});
 $("#addMission").addEventListener("click", () => openMission(null));
 $("#mExp").addEventListener("click", e => { const b = e.target.closest(".pill"); if (!b) return; draft.exp = +b.dataset.e; paintDraft(); });
 $("#mDays").addEventListener("click", e => {
@@ -445,15 +507,19 @@ $("#mTime").addEventListener("change", e => { draft.time = e.target.value; });
 $("#mName").addEventListener("input", e => { draft.title = e.target.value; });
 $("#mCancel").addEventListener("click", closeSheets);
 $("#mSave").addEventListener("click", () => {
-  const t = draft.title.trim();
-  if (!t) { $("#mName").focus(); return; }
-  if (!draft.days.length) draft.days = [0,1,2,3,4,5,6];
-  if (editing) {
-    const m = st.missions.find(x => x.id === editing);
-    Object.assign(m, { title: t, exp: draft.exp, days: draft.days, mode: draft.mode, time: draft.mode ? draft.time : "" });
+  let data;
+  if (draft.type === "wake") {
+    data = wakeMission(null, draft.wakeTime);
+    delete data.id;
   } else {
-    st.missions.push({ id: uid(), title: t, exp: draft.exp, days: draft.days, mode: draft.mode, time: draft.mode ? draft.time : "" });
+    const t = draft.title.trim();
+    if (!t) { $("#mName").focus(); return; }
+    if (!draft.days.length) draft.days = [0,1,2,3,4,5,6];
+    data = { type: "free", title: t, exp: draft.exp, days: draft.days,
+             mode: draft.mode, time: draft.mode ? draft.time : "" };
   }
+  if (editing) Object.assign(st.missions.find(x => x.id === editing), data);
+  else st.missions.push(Object.assign({ id: uid() }, data));
   save(); render(); closeSheets();
 });
 let delArm = false;
@@ -520,16 +586,11 @@ $("#dEvents").addEventListener("click", e => {
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act, id = b.dataset.id;
-  if (act === "toggle") {
+  if (act === "claim") {
     const m = st.missions.find(x => x.id === id); if (!m) return;
-    const now = new Date(), tk = keyOf(now);
-    const done = doneOn(m.id, tk);
-    if (!done) {
-      if (!m.days.includes(now.getDay())) { return; }
-      const w = windowState(m, now);
-      if (w !== "ok") { flash(b); return; }
-      toggleDone(m.id, tk, true); addExp(m.exp);
-    } else { toggleDone(m.id, tk, false); addExp(-m.exp); }
+    const now = new Date();
+    if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
+    toggleDone(m.id, keyOf(now), true); addExp(m.exp);   // 受け取ったら取り消せない
     save(); render();
   }
   if (act === "edit") { const m = st.missions.find(x => x.id === id); if (m) openMission(m); }

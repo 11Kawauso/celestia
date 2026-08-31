@@ -163,30 +163,50 @@
   <div class="sheetin">
     <div class="grab"></div>
     <div class="sheettitle" id="mTitle">ミッションを追加</div>
-    <input class="field" id="mName" placeholder="例：7時に起きる">
-    <div>
-      <div class="lab" style="margin-bottom:6px">もらえるEXP</div>
-      <div class="pills" id="mExp">
-        <button class="pill" data-e="10">かるい 10</button>
-        <button class="pill on" data-e="20">ふつう 20</button>
-        <button class="pill" data-e="30">たいへん 30</button>
+
+    <div id="mTypeRow">
+      <div class="lab" style="margin-bottom:6px">種類</div>
+      <div class="pills" id="mType">
+        <button class="pill" data-k="wake">早起き</button>
+        <button class="pill" data-k="free">自由</button>
       </div>
     </div>
-    <div>
-      <div class="lab" style="margin-bottom:6px">くり返す曜日</div>
-      <div class="days" id="mDays"></div>
+
+    <!-- 早起き：時刻をえらぶだけ。タイトルとEXPと曜日は自動 -->
+    <div id="mWake">
+      <div class="lab" style="margin-bottom:6px">起きる時刻</div>
+      <div class="pills" id="mWakeTime"></div>
+      <div class="note" style="margin-top:8px">朝5時から、えらんだ時刻までの間だけ報酬を受け取れます。早い時刻ほどEXPが多くなります。毎日くり返します。</div>
     </div>
-    <div>
-      <div class="lab" style="margin-bottom:6px">時間のしばり</div>
-      <div class="pills" id="mMode">
-        <button class="pill on" data-m="">なし</button>
-        <button class="pill" data-m="before">この時刻まで</button>
-        <button class="pill" data-m="after">この時刻から</button>
+
+    <!-- 自由 -->
+    <div id="mFree">
+      <input class="field" id="mName" placeholder="例：ストレッチをする">
+      <div>
+        <div class="lab" style="margin-bottom:6px">もらえるEXP</div>
+        <div class="pills" id="mExp">
+          <button class="pill" data-e="10">かるい 10</button>
+          <button class="pill on" data-e="20">ふつう 20</button>
+          <button class="pill" data-e="30">たいへん 30</button>
+        </div>
       </div>
-      <div class="timerow" id="mTimeRow" style="margin-top:8px" hidden>
-        <input class="field" type="time" id="mTime" value="07:00">
+      <div>
+        <div class="lab" style="margin-bottom:6px">くり返す曜日</div>
+        <div class="days" id="mDays"></div>
+      </div>
+      <div>
+        <div class="lab" style="margin-bottom:6px">時間のしばり</div>
+        <div class="pills" id="mMode">
+          <button class="pill on" data-m="">なし</button>
+          <button class="pill" data-m="before">この時刻まで</button>
+          <button class="pill" data-m="after">この時刻から</button>
+        </div>
+        <div class="timerow" id="mTimeRow" style="margin-top:8px" hidden>
+          <input class="field" type="time" id="mTime" value="07:00">
+        </div>
       </div>
     </div>
+
     <div class="btnrow">
       <button class="btn" id="mCancel">やめる</button>
       <button class="btn pri" id="mSave">保存する</button>
