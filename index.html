@@ -108,14 +108,9 @@
     <!-- SETTINGS -->
     <section class="view" id="v-set">
       <div class="card">
-        <div class="lab">キャラクター</div>
-        <input class="field" id="setName" placeholder="キャラの名前">
-        <div class="btnrow">
-          <label class="btn" for="imgInput">画像をえらぶ</label>
-          <button class="btn" id="imgClear">画像を消す</button>
-        </div>
-        <input type="file" id="imgInput" accept="image/*" hidden>
-        <div class="note">正方形に切り取って小さく保存します。ibisPaintで描いた絵をそのまま使えます。</div>
+        <div class="lab">あなたの名前</div>
+        <input class="field" id="userName" placeholder="呼ばれたい名前" maxlength="20" enterkeyhint="done">
+        <div class="note">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div>
       </div>
 
       <div class="card">

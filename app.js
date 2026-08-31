@@ -7,12 +7,15 @@ const keyOf = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.g
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+/* キャラクターは全ユーザー共通で固定。ユーザーが変えられるのは自分の呼ばれ方だけ。 */
+const CHARA = "セレスティア";
 
 /* ---------- state ---------- */
 function seed() {
   return {
     v: 2,
-    chara: { name: "セレスティア", img: null, level: 1, exp: 0 },
+    chara: { level: 1, exp: 0 },
+    user: "",
     missions: [
       { id: uid(), title: "6時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "06:00" },
       { id: uid(), title: "ストレッチをする", exp: 10, days: [0,1,2,3,4,5,6], mode: "", time: "" },
@@ -39,6 +42,11 @@ normalize(st);
 
 /* 古い保存データを今の形にそろえる。「やることリスト」は長期目標に置きかわったので捨てる。 */
 function normalize(o) {
+  o.chara = o.chara || { level: 1, exp: 0 };
+  o.chara.level = o.chara.level || 1;
+  o.chara.exp = o.chara.exp || 0;
+  delete o.chara.name; delete o.chara.img;   // キャラ設定は廃止。名前は固定、絵は持たない
+  o.user = typeof o.user === "string" ? o.user : "";
   o.missions = o.missions || [];
   o.goals = o.goals || [];
   o.goals.forEach(g => {
@@ -56,7 +64,7 @@ let saveWarned = false;
 function save() {
   try { localStorage.setItem(LS, JSON.stringify(st)); }
   catch (e) {
-    if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。画像が大きすぎるかもしれません。", true); }
+    if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。端末の空き容量を確認してください。", true); }
   }
 }
 function setMsg(t, bad) {
@@ -86,7 +94,8 @@ function addExp(n) {
 let luTimer = null;
 function levelUp() {
   $("#luNum").textContent = st.chara.level;
-  $("#luSub").textContent = st.chara.name + " ／ " + rankOf(st.chara.level);
+  const you = (st.user || "").trim();
+  $("#luSub").textContent = (you ? you + "、おめでとう ／ " : CHARA + " ／ ") + rankOf(st.chara.level);
   const el = $("#levelup"); el.classList.add("on");
   clearTimeout(luTimer); luTimer = setTimeout(() => el.classList.remove("on"), 1900);
 }
@@ -137,7 +146,7 @@ function render() {
 
   // hero
   const c = st.chara;
-  $("#cname").textContent = c.name || "セレスティア";
+  $("#cname").textContent = CHARA;
   $("#rank").textContent = rankOf(c.level);
   $("#lvnum").textContent = c.level;
   const nd = need(c.level);
@@ -147,11 +156,6 @@ function render() {
   $("#ringfill").setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
   $("#expnow").textContent = c.exp + " / " + nd + " EXP";
   $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
-  const face = $("#face");
-  face.innerHTML = c.img
-    ? '<img src="' + c.img + '" alt="キャラクター">'
-    : '<span class="rune">' + esc((c.name || "セ")[0]) + "</span>";
-
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.title.localeCompare(b.title, "ja"));
@@ -183,7 +187,7 @@ function render() {
 
   renderGoals();
   renderCal();
-  if ($("#setName").value !== (c.name || "")) $("#setName").value = c.name || "";
+  if ($("#userName").value !== st.user) $("#userName").value = st.user;
   if (document.activeElement !== $("#backup")) $("#backup").value = JSON.stringify(st);
 }
 
@@ -529,26 +533,7 @@ $("#gDelete").addEventListener("click", e => {
 });
 
 /* ---------- settings ---------- */
-$("#setName").addEventListener("input", e => { st.chara.name = e.target.value; save(); render(); });
-$("#imgInput").addEventListener("change", e => {
-  const f = e.target.files && e.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => {
-    const im = new Image();
-    im.onload = () => {
-      const S = 400, c = document.createElement("canvas");
-      c.width = c.height = S;
-      const s = Math.min(im.width, im.height), g = c.getContext("2d");
-      g.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, S, S);
-      st.chara.img = c.toDataURL("image/jpeg", 0.82);
-      save(); render(); setMsg("画像を設定しました");
-    };
-    im.src = r.result;
-  };
-  r.readAsDataURL(f);
-  e.target.value = "";
-});
-$("#imgClear").addEventListener("click", () => { st.chara.img = null; save(); render(); });
+$("#userName").addEventListener("input", e => { st.user = e.target.value; save(); });
 $("#copyBk").addEventListener("click", async () => {
   const t = $("#backup");
   try { await navigator.clipboard.writeText(t.value); setMsg("コピーしました"); }
