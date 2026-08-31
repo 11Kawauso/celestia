@@ -348,6 +348,16 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
       </div>
 
       <div class="card">
+        <div class="lab">見た目</div>
+        <div class="pills" id="themePills">
+          <button class="pill" data-t="auto">自動</button>
+          <button class="pill" data-t="dark">夜（紺）</button>
+          <button class="pill" data-t="light">昼（白）</button>
+        </div>
+        <div class="note">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div>
+      </div>
+
+      <div class="card">
         <div class="lab">ホーム画面に置く</div>
         <div class="note">Safariでこのページを開く → 下の<b>共有ボタン</b> → <b>ホーム画面に追加</b>。次からはアプリのように全画面で開きます。中身を更新しても置き直しは不要です。</div>
         <div class="note" id="swState">オフライン対応：確認中…</div>
@@ -475,7 +485,7 @@ function seed() {
       { id: uid(), title: "ストレッチをする", exp: 10, days: [0,1,2,3,4,5,6], mode: "", time: "" },
       { id: uid(), title: "コードを書く", exp: 20, days: [1,2,3,4,5], mode: "", time: "" }
     ],
-    todos: [], events: {}, log: {}
+    todos: [], events: {}, log: {}, theme: "auto"
   };
 }
 let st;
@@ -486,6 +496,7 @@ try {
 if (!st || !st.chara) st = seed();
 st.missions = st.missions || []; st.todos = st.todos || [];
 st.events = st.events || {}; st.log = st.log || {};
+st.theme = st.theme || "auto";
 
 let saveWarned = false;
 function save() {
@@ -872,8 +883,8 @@ $("#doRestore").addEventListener("click", () => {
     const o = JSON.parse($("#restoreIn").value);
     if (!o || !o.chara) throw new Error("bad");
     st = o; st.missions = st.missions || []; st.todos = st.todos || [];
-    st.events = st.events || {}; st.log = st.log || {};
-    save(); render(); setMsg("読みこみました");
+    st.events = st.events || {}; st.log = st.log || {}; st.theme = st.theme || "auto";
+    save(); applyTheme(); render(); setMsg("読みこみました");
     $("#restoreIn").value = ""; $("#restoreBox").hidden = true;
   } catch (e) { setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true); }
 });
@@ -881,10 +892,33 @@ let wipeArm = false;
 $("#wipe").addEventListener("click", e => {
   if (!wipeArm) { wipeArm = true; e.target.textContent = "本当に消す？ もう一度おす"; setTimeout(() => { wipeArm = false; e.target.textContent = "ぜんぶ消して最初から"; }, 3500); return; }
   st = seed(); wipeArm = false; e.target.textContent = "ぜんぶ消して最初から";
-  save(); render(); setMsg("最初にもどしました");
+  save(); applyTheme(); render(); setMsg("最初にもどしました");
 });
 
+/* ---------- theme ---------- */
+function applyTheme() {
+  const t = st.theme || "auto";
+  const root = document.documentElement;
+  if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+  $$("#themePills .pill").forEach(p => p.classList.toggle("on", p.dataset.t === t));
+  let dark = t === "dark";
+  if (t === "auto" && window.matchMedia) dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute("content", dark ? "#0d1020" : "#f3f5fc");
+}
+$("#themePills").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  st.theme = b.dataset.t; save(); applyTheme();
+});
+if (window.matchMedia) {
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => { if ((st.theme || "auto") === "auto") applyTheme(); };
+  if (mq.addEventListener) mq.addEventListener("change", onChange);
+  else if (mq.addListener) mq.addListener(onChange);
+}
+
 /* ---------- boot ---------- */
+applyTheme();
 render();
 let lastDay = keyOf(new Date());
 setInterval(() => {
