@@ -85,6 +85,11 @@ function normalize(o) {
     };
   });
 
+  // 早起きは固定ミッション。無ければ足し、増えていたら最初の1つに寄せる
+  const wakes = o.missions.filter(m => m.type === "wake");
+  o.missions = [wakes[0] || wakeMission(uid(), WAKE_DEFAULT)]
+    .concat(o.missions.filter(m => m.type !== "wake"));
+
   o.goals = asArr(o.goals).map(x => {
     const g = asObj(x);
     return {
@@ -294,7 +299,8 @@ function render() {
   $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
-    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.title.localeCompare(b.title, "ja"));
+    .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
+      sortKey(a).localeCompare(sortKey(b)) || a.title.localeCompare(b.title, "ja"));
   const doneCount = todays.filter(m => doneOn(m.id, tk)).length;
   $("#s-done").textContent = doneCount;
   $("#s-left").textContent = todays.length - doneCount;
@@ -452,7 +458,6 @@ $("#mWakeTime").innerHTML = WAKE.map(w =>
 
 function paintDraft() {
   const wake = draft.type === "wake";
-  $$("#mType .pill").forEach(p => p.classList.toggle("on", p.dataset.k === draft.type));
   $("#mWake").hidden = !wake;
   $("#mFree").hidden = wake;
   if (wake) {
@@ -469,23 +474,19 @@ function paintDraft() {
 }
 function openMission(m) {
   editing = m ? m.id : null;
+  // 追加でつくれるのは自由ミッションだけ。早起きは固定で、時刻の変更だけできる
   draft = m
     ? { type: m.type, title: m.title, exp: m.exp, days: m.days.slice(),
         mode: m.mode || "", time: m.time || "",
         wakeTime: m.type === "wake" ? m.time : WAKE_DEFAULT }
-    : { type: "wake", title: "", exp: 20, days: [0,1,2,3,4,5,6],
+    : { type: "free", title: "", exp: 20, days: [0,1,2,3,4,5,6],
         mode: "", time: "", wakeTime: WAKE_DEFAULT };
   $("#mTitle").textContent = m
     ? (m.type === "wake" ? "早起きミッションを編集" : "ミッションを編集")
     : "ミッションを追加";
-  $("#mTypeRow").hidden = !!m;   // 種類はあとから変えない
-  $("#mDelete").hidden = !m;
+  $("#mDelete").hidden = !m || m.type === "wake";   // 早起きは消せない
   paintDraft(); openSheet("#sheetM");
 }
-$("#mType").addEventListener("click", e => {
-  const b = e.target.closest(".pill"); if (!b) return;
-  draft.type = b.dataset.k; paintDraft();
-});
 $("#mWakeTime").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
   draft.wakeTime = b.dataset.t; paintDraft();
@@ -525,6 +526,8 @@ $("#mSave").addEventListener("click", () => {
 let delArm = false;
 $("#mDelete").addEventListener("click", e => {
   if (!delArm) { delArm = true; e.target.textContent = "もう一度おすと消えます"; setTimeout(() => { delArm = false; e.target.textContent = "このミッションを消す"; }, 3000); return; }
+  const target = st.missions.find(m => m.id === editing);
+  if (target && target.type === "wake") { closeSheets(); return; }   // 早起きは消せない
   st.missions = st.missions.filter(m => m.id !== editing);
   Object.keys(st.log).forEach(k => { st.log[k] = st.log[k].filter(id => id !== editing); if (!st.log[k].length) delete st.log[k]; });
   delArm = false; e.target.textContent = "このミッションを消す";
