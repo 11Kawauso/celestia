@@ -32,34 +32,81 @@ function seed() {
     events: {}, log: {}, theme: "auto"
   };
 }
+/* 保存データを今の形にそろえる。古い版から来たものも、手で書きかえられたものも
+   ここを通る。中身は捨てずに、型だけを直す。ここで数値・日付・時刻をきちんと
+   絞っておくことが、描画側が変なものを掴まない一番の守りになる。 */
+const asStr = v => (typeof v === "string" ? v : "");
+const asNum = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
+const asArr = v => (Array.isArray(v) ? v : []);
+const asObj = v => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+const asDate = v => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
+const asTime = v => (/^\d{2}:\d{2}$/.test(v) ? v : "");
+
+function normalize(o) {
+  o = asObj(o);
+  const c = asObj(o.chara);   // 名前と絵はもう持たないので作り直す
+  o.chara = {
+    level: Math.max(1, Math.floor(asNum(c.level, 1))),
+    exp: Math.max(0, Math.floor(asNum(c.exp, 0)))
+  };
+  o.user = asStr(o.user).slice(0, 40);
+  o.theme = ["auto", "dark", "light"].indexOf(o.theme) >= 0 ? o.theme : "auto";
+
+  o.missions = asArr(o.missions).map(x => {
+    const m = asObj(x);
+    const mode = (m.mode === "before" || m.mode === "after") ? m.mode : "";
+    return {
+      id: asStr(m.id) || uid(),
+      title: asStr(m.title),
+      exp: Math.max(0, Math.floor(asNum(m.exp, 10))),
+      days: asArr(m.days).map(d => Math.floor(asNum(d, -1))).filter(d => d >= 0 && d <= 6),
+      mode: mode,
+      time: mode ? asTime(m.time) : ""
+    };
+  });
+
+  o.goals = asArr(o.goals).map(x => {
+    const g = asObj(x);
+    return {
+      id: asStr(g.id) || uid(),
+      title: asStr(g.title),
+      due: asDate(g.due),
+      done: !!g.done,
+      doneAt: asDate(g.doneAt),
+      steps: asArr(g.steps).map(y => {
+        const s = asObj(y);
+        return { id: asStr(s.id) || uid(), title: asStr(s.title), done: !!s.done };
+      })
+    };
+  });
+
+  const ev = asObj(o.events); o.events = {};
+  Object.keys(ev).forEach(k => {
+    const list = asArr(ev[k]).map(y => {
+      const e = asObj(y);
+      return { id: asStr(e.id) || uid(), title: asStr(e.title), time: asTime(e.time) };
+    });
+    if (list.length) o.events[k] = list;
+  });
+
+  const lg = asObj(o.log); o.log = {};
+  Object.keys(lg).forEach(k => {
+    const list = asArr(lg[k]).filter(x => typeof x === "string");
+    if (list.length) o.log[k] = list;
+  });
+
+  o.v = 2;
+  delete o.todos; delete o.help;
+  return o;
+}
+
 let st;
 try {
   const raw = localStorage.getItem(LS);
   st = raw ? JSON.parse(raw) : seed();
 } catch (e) { st = seed(); }
 if (!st || !st.chara) st = seed();
-normalize(st);
-
-/* 古い保存データを今の形にそろえる。「やることリスト」は長期目標に置きかわったので捨てる。 */
-function normalize(o) {
-  o.chara = o.chara || { level: 1, exp: 0 };
-  o.chara.level = o.chara.level || 1;
-  o.chara.exp = o.chara.exp || 0;
-  delete o.chara.name; delete o.chara.img;   // キャラ設定は廃止。名前は固定、絵は持たない
-  o.user = typeof o.user === "string" ? o.user : "";
-  delete o.help;
-  o.missions = o.missions || [];
-  o.goals = o.goals || [];
-  o.goals.forEach(g => {
-    g.steps = g.steps || [];
-    g.steps.forEach(x => { x.id = x.id || uid(); x.done = !!x.done; });
-    g.due = g.due || ""; g.done = !!g.done; g.doneAt = g.doneAt || "";
-  });
-  o.events = o.events || {}; o.log = o.log || {};
-  o.theme = o.theme || "auto";
-  delete o.todos;
-  return o;
-}
+st = normalize(st);
 
 let saveWarned = false;
 function save() {
@@ -263,11 +310,11 @@ function missionRow(m, tk, now, dim) {
   if (s > 1) chips.push('<span class="chip fire">' + s + "日れんぞく</span>");
   const cls = "row" + (done ? " done" : "") + ((!done && w !== "ok") || dim ? " locked" : "");
   return '<div class="' + cls + '" data-m="' + m.id + '">' +
-    '<button class="check" data-act="toggle" data-id="' + m.id + '" aria-label="達成"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' +
+    '<button class="check" data-act="toggle" data-id="' + esc(m.id) + '" aria-label="達成"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' +
     '<div class="rowbody"><div class="rowtitle">' + esc(m.title) + "</div>" +
     '<div class="chips">' + chips.join("") + "</div></div>" +
-    '<span class="expbadge">+' + m.exp + "</span>" +
-    '<button class="edit" data-act="edit" data-id="' + m.id + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
+    '<span class="expbadge">+' + esc(m.exp) + "</span>" +
+    '<button class="edit" data-act="edit" data-id="' + esc(m.id) + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
     "</div>";
 }
 
@@ -297,16 +344,16 @@ function goalCard(g) {
   if (g.done) chips.push('<span class="chip ok">達成</span>');
   const ready = !g.done && total > 0 && dn === total;
   const steps = g.steps.map(x =>
-    '<button class="gstep' + (x.done ? " on" : "") + '" data-act="gstep" data-id="' + g.id + '" data-s="' + x.id + '">' +
+    '<button class="gstep' + (x.done ? " on" : "") + '" data-act="gstep" data-id="' + esc(g.id) + '" data-s="' + esc(x.id) + '">' +
     '<span class="gbox"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>' +
     '<span class="gtxt">' + esc(x.title) + "</span></button>").join("");
   return '<div class="goal' + (g.done ? " done" : "") + '">' +
     '<div class="goalhead"><div class="goaltitle">' + esc(g.title) + "</div>" +
-    '<button class="edit" data-act="gedit" data-id="' + g.id + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>' +
+    '<button class="edit" data-act="gedit" data-id="' + esc(g.id) + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>' +
     (chips.length ? '<div class="chips">' + chips.join("") + "</div>" : "") +
     (total ? '<div class="track"><div class="fill" style="width:' + Math.round(ratio * 100) + '%"></div></div>' : "") +
     (total ? '<div class="gsteps">' + steps + "</div>" : "") +
-    '<button class="gfin' + (ready ? " ready" : "") + '" data-act="gdone" data-id="' + g.id + '">' +
+    '<button class="gfin' + (ready ? " ready" : "") + '" data-act="gdone" data-id="' + esc(g.id) + '">' +
     (g.done ? "やっぱり続ける" : "達成にする") + "</button></div>";
 }
 /* 期限のあるものを先に、近い順。期限なしは後ろ。 */
@@ -437,7 +484,7 @@ function paintDay() {
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
     '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
     (e.time ? '<div class="chips"><span class="chip time">' + esc(e.time) + "</span></div>" : "") + "</div>" +
-    '<button class="del" data-act="evdel" data-id="' + e.id + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></div>'
+    '<button class="del" data-act="evdel" data-id="' + esc(e.id) + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></div>'
   ).join("") : '<div class="empty">予定なし</div>';
 
   const gd = st.goals.filter(g => g.due === k);
@@ -670,13 +717,20 @@ $("#copyBk").addEventListener("click", async () => {
 });
 $("#showRestore").addEventListener("click", () => { const b = $("#restoreBox"); b.hidden = !b.hidden; });
 $("#doRestore").addEventListener("click", () => {
+  const keep = st;   // 失敗したときに戻すための控え
   try {
     const o = JSON.parse($("#restoreIn").value);
-    if (!o || !o.chara) throw new Error("bad");
+    if (!o || typeof o !== "object" || !o.chara) throw new Error("bad");
     st = normalize(o);
-    save(); applyTheme(); render(); setMsg("読みこみました");
+    render();          // 先に描いてみる。ここで落ちるなら保存しない
+    save(); applyTheme();
+    setMsg("読みこみました");
     $("#restoreIn").value = ""; $("#restoreBox").hidden = true;
-  } catch (e) { setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true); }
+  } catch (e) {
+    st = keep;         // 元のデータはまだ保存領域にある。画面も戻す
+    try { applyTheme(); render(); } catch (e2) {}
+    setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true);
+  }
 });
 let wipeArm = false;
 $("#wipe").addEventListener("click", e => {
