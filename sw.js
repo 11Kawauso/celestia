@@ -10,10 +10,10 @@ const CORE = [
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./icon-512-maskable.png",
-  "./apple-touch-icon.png"
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-512-maskable.png",
+  "./icons/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", e => {

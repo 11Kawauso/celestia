@@ -12,9 +12,7 @@
 | `app.js` | 動き |
 | `manifest.json` | アプリ名・アイコン・全画面表示の設定 |
 | `sw.js` | Service Worker。オフラインで開けるようにする |
-| `icon-192.png` / `icon-512.png` | アプリアイコン |
-| `icon-512-maskable.png` | Android用（余白ありのアイコン） |
-| `apple-touch-icon.png` | iPhoneのホーム画面アイコン |
+| `icons/` | アイコン4種（iPhone用・Android用・PWA用）|
 
 ## GitHub Pages に置く
 
@@ -41,7 +39,7 @@ GitHubのリポジトリ名に日本語は使えず、入力してもハイフ�
 
 ただし次のものを変えたときだけは、一度削除して追加し直す必要がある。
 
-- アイコン（`apple-touch-icon.png`）
+- アイコン（`icons/apple-touch-icon.png`）
 - アプリ名（`manifest.json` の `short_name`）
 
 ## 更新のしかた
