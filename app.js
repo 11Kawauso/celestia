@@ -29,7 +29,7 @@ function seed() {
           { id: uid(), title: "公開する", done: false }
         ] }
     ],
-    events: {}, log: {}, theme: "auto"
+    events: {}, log: {}, theme: "auto", help: false
   };
 }
 let st;
@@ -47,6 +47,7 @@ function normalize(o) {
   o.chara.exp = o.chara.exp || 0;
   delete o.chara.name; delete o.chara.img;   // キャラ設定は廃止。名前は固定、絵は持たない
   o.user = typeof o.user === "string" ? o.user : "";
+  o.help = !!o.help;
   o.missions = o.missions || [];
   o.goals = o.goals || [];
   o.goals.forEach(g => {
@@ -450,8 +451,25 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   window.scrollTo(0, 0);
+  syncHelpBtn();
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
+
+/* ---------- help ---------- */
+/* ホームには説明が無いので、そこでは「?」自体を出さない。 */
+function syncHelpBtn() {
+  const t = $(".tab.on");
+  $("#helpBtn").hidden = !t || t.dataset.v === "home";
+}
+function applyHelp() {
+  const on = !!st.help;
+  document.body.classList.toggle("help", on);
+  const b = $("#helpBtn");
+  b.classList.toggle("on", on);
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  b.setAttribute("aria-label", on ? "説明をかくす" : "説明を見る");
+}
+$("#helpBtn").addEventListener("click", () => { st.help = !st.help; save(); applyHelp(); });
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
 
@@ -545,7 +563,7 @@ $("#doRestore").addEventListener("click", () => {
     const o = JSON.parse($("#restoreIn").value);
     if (!o || !o.chara) throw new Error("bad");
     st = normalize(o);
-    save(); applyTheme(); render(); setMsg("読みこみました");
+    save(); applyTheme(); applyHelp(); render(); setMsg("読みこみました");
     $("#restoreIn").value = ""; $("#restoreBox").hidden = true;
   } catch (e) { setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true); }
 });
@@ -553,7 +571,7 @@ let wipeArm = false;
 $("#wipe").addEventListener("click", e => {
   if (!wipeArm) { wipeArm = true; e.target.textContent = "本当に消す？ もう一度おす"; setTimeout(() => { wipeArm = false; e.target.textContent = "ぜんぶ消して最初から"; }, 3500); return; }
   st = seed(); wipeArm = false; e.target.textContent = "ぜんぶ消して最初から";
-  save(); applyTheme(); render(); setMsg("最初にもどしました");
+  save(); applyTheme(); applyHelp(); render(); setMsg("最初にもどしました");
 });
 
 /* ---------- theme ---------- */
@@ -580,6 +598,8 @@ if (window.matchMedia) {
 
 /* ---------- boot ---------- */
 applyTheme();
+applyHelp();
+syncHelpBtn();
 render();
 let lastDay = keyOf(new Date());
 setInterval(() => {
