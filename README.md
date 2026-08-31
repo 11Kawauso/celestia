@@ -7,7 +7,9 @@
 
 | ファイル | 中身 |
 | --- | --- |
-| `index.html` | アプリ本体。HTML・CSS・JS が全部この中 |
+| `index.html` | 画面の骨組み（HTML）|
+| `style.css` | 見た目 |
+| `app.js` | 動き |
 | `manifest.json` | アプリ名・アイコン・全画面表示の設定 |
 | `sw.js` | Service Worker。オフラインで開けるようにする |
 | `icon-192.png` / `icon-512.png` | アプリアイコン |
@@ -44,7 +46,8 @@ GitHubのリポジトリ名に日本語は使えず、入力してもハイフ�
 
 ## 更新のしかた
 
-`index.html` を書き換えて GitHub に push するだけ。
+書き換えて GitHub に push するだけ。
+画面の並びは `index.html`、色や余白は `style.css`、動きは `app.js`。
 大きく作り変えたときは `sw.js` の `CACHE` の値を `celestia-v2` のように上げると、
 古いキャッシュがきれいに捨てられる。
 

@@ -3,10 +3,12 @@
    だからサイトを更新すれば次に開いたとき必ず新しくなる。
    電波がないときだけキャッシュを出すので、オフラインでも開ける。 */
 
-const CACHE = "celestia-v1";
+const CACHE = "celestia-v2";
 const CORE = [
   "./",
   "./index.html",
+  "./style.css",
+  "./app.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
