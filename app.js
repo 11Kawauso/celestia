@@ -17,9 +17,7 @@ function seed() {
     chara: { level: 1, exp: 0 },
     user: "",
     missions: [
-      { id: uid(), title: "6時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "06:00" },
-      { id: uid(), title: "ストレッチをする", exp: 10, days: [0,1,2,3,4,5,6], mode: "", time: "" },
-      { id: uid(), title: "コードを書く", exp: 20, days: [1,2,3,4,5], mode: "", time: "" }
+      { id: uid(), title: "6時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "06:00" }
     ],
     goals: [
       { id: uid(), title: "アプリを完成させる", due: "", done: false, doneAt: "",
