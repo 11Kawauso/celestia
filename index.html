@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="セレスティア">
+<meta name="theme-color" content="#0d1020">
+<title>セレスティア</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#f3f5fc; --bg2:#ffffff; --bg3:#e9edfa; --line:#d4dbf1;
+  --ink:#121734; --ink2:#4f5779; --ink3:#838ab0;
+  --night:#1d3382; --dusk:#2c4bab; --dawn:#a8791f;
+  --ok:#2f8468; --bad:#b8534f;
+  --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1020; --bg2:#161b2f; --bg3:#1f2540; --line:#2e3559;
+    --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
+    --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
+    --ok:#4fb894; --bad:#e0797a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1020; --bg2:#161b2f; --bg3:#1f2540; --line:#2e3559;
+  --ink:#eef1fb; --ink2:#9aa4c9; --ink3:#676f96;
+  --night:#2f4bb0; --dusk:#4a72e0; --dawn:#f0c04a;
+  --ok:#4fb894; --bad:#e0797a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.4);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+  font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:6px}
+
+.wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.top{
+  position:sticky;top:0;z-index:20;background:var(--bg);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 10px) 18px 10px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+}
+.brand{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:15px;letter-spacing:.08em}
+.topdate{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
+main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
+.view{display:none;flex-direction:column;gap:18px}
+.view.on{display:flex}
+
+/* ---- character panel ---- */
+.hero{
+  background:var(--bg2);border:1px solid var(--line);border-radius:20px;
+  padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 88% -20%,color-mix(in srgb,var(--dawn) 22%,transparent),transparent 60%);
+}
+.heroTop{display:flex;gap:14px;align-items:center;position:relative}
+.halo{position:relative;width:104px;height:104px;flex:none}
+.ring{position:absolute;inset:0;width:104px;height:104px;transform:rotate(-90deg);overflow:visible}
+.rbg{fill:none;stroke:var(--line);stroke-width:4}
+.rfill{fill:none;stroke:url(#haloGrad);stroke-width:4;stroke-linecap:round;
+  transition:stroke-dashoffset .55s cubic-bezier(.3,.8,.3,1);
+  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--dawn) 55%,transparent))}
+.gs1{stop-color:var(--dusk)} .gs2{stop-color:var(--dawn)} .gs3{stop-color:var(--dawn)}
+.face{
+  position:absolute;left:11px;top:11px;width:82px;height:82px;border-radius:50%;overflow:hidden;
+  background:var(--bg3);border:1px solid var(--line);
+  display:grid;place-items:center;
+}
+.face img{width:100%;height:100%;object-fit:cover;display:block}
+.face .rune{font-family:"Shippori Mincho B1",serif;font-size:28px;color:var(--ink3)}
+.who{min-width:0;flex:1}
+.cname{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:21px;line-height:1.25;text-wrap:balance;overflow-wrap:anywhere}
+.rank{font-size:11.5px;letter-spacing:.14em;color:var(--dawn);margin-top:2px}
+.lvrow{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+.lvlab{font-size:11px;letter-spacing:.14em;color:var(--ink3)}
+.lvnum{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.bar{margin-top:14px;position:relative}
+.track{height:9px;border-radius:99px;background:var(--bg3);overflow:hidden;border:1px solid var(--line)}
+.fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--night),var(--dusk),var(--dawn));transition:width .45s cubic-bezier(.3,.8,.3,1)}
+.barmeta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.today{display:flex;gap:8px;margin-top:14px;position:relative}
+.stat{flex:1;background:var(--bg3);border-radius:11px;padding:8px 10px;text-align:center}
+.stat b{display:block;font-size:17px;font-variant-numeric:tabular-nums;font-weight:700}
+.stat span{font-size:10.5px;color:var(--ink3);letter-spacing:.08em}
+
+/* ---- sections ---- */
+.sec{display:flex;flex-direction:column;gap:9px}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 2px}
+.sectitle{font-family:"Shippori Mincho B1",serif;font-weight:600;font-size:15px;letter-spacing:.06em}
+.addbtn{font-size:12.5px;color:var(--dawn);font-weight:700;padding:4px 8px;border-radius:8px}
+.addbtn:active{background:var(--bg3)}
+.empty{background:var(--bg2);border:1px dashed var(--line);border-radius:var(--r);padding:20px 16px;text-align:center;color:var(--ink3);font-size:13px}
+
+/* ---- mission row ---- */
+.row{
+  display:flex;align-items:center;gap:12px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;box-shadow:var(--shadow);
+}
+.row.done{background:color-mix(in srgb,var(--ok) 9%,var(--bg2));border-color:color-mix(in srgb,var(--ok) 26%,var(--line))}
+.row.locked{opacity:.55}
+.check{
+  width:32px;height:32px;flex:none;border-radius:50%;border:2px solid var(--line);
+  display:grid;place-items:center;transition:transform .12s;
+}
+.check:active{transform:scale(.9)}
+.check svg{width:16px;height:16px;stroke:var(--ink3);stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.row.done .check{border-color:transparent;background:linear-gradient(135deg,var(--night),var(--dusk),var(--dawn))}
+.row.done .check svg{stroke:#fff;opacity:1}
+.rowbody{flex:1;min-width:0}
+.rowtitle{font-size:14.5px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
+.row.done .rowtitle{color:var(--ink2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip{font-size:10.5px;color:var(--ink3);background:var(--bg3);padding:2px 7px;border-radius:99px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.time{color:var(--dawn);background:color-mix(in srgb,var(--dawn) 13%,transparent)}
+.chip.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
+.chip.fire{color:var(--dusk);background:color-mix(in srgb,var(--dusk) 13%,transparent)}
+.expbadge{font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums;flex:none;letter-spacing:.02em}
+.edit{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--ink3)}
+.edit:active{background:var(--bg3)}
+.edit svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- calendar ---- */
+.calhead{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.calmon{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:19px;font-variant-numeric:tabular-nums}
+.navb{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--ink2);background:var(--bg2);border:1px solid var(--line)}
+.navb:active{background:var(--bg3)}
+.navb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:10.5px;color:var(--ink3);padding:4px 0;letter-spacing:.05em}
+.dow.s{color:var(--night)} .dow.n{color:var(--dusk)}
+.cell{
+  aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
+  padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
+}
+.cell.pad{background:transparent;border-color:transparent}
+.cell.now{border-color:var(--dawn);box-shadow:0 0 0 1px var(--dawn) inset}
+.cell .d{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.cell.now .d{color:var(--dawn);font-weight:700}
+.cell .dot{width:4px;height:4px;border-radius:50%;background:var(--night)}
+.cell .mini{position:absolute;left:5px;right:5px;bottom:5px;height:3px;border-radius:99px;background:var(--bg3);overflow:hidden}
+.cell .mini i{display:block;height:100%;background:linear-gradient(90deg,var(--dusk),var(--dawn))}
+
+/* ---- list ---- */
+.addline{display:flex;gap:8px}
+.addline input{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;font-size:14.5px}
+.addline button{background:linear-gradient(135deg,var(--dusk),var(--dawn));color:#fff;font-weight:700;font-size:14px;padding:0 16px;border-radius:var(--r)}
+.donehead{font-size:11px;letter-spacing:.12em;color:var(--ink3);margin-top:6px;padding:0 2px}
+.row.strike .rowtitle{text-decoration:line-through;color:var(--ink3)}
+.del{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--ink3)}
+.del svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- settings ---- */
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:11px}
+.lab{font-size:11px;letter-spacing:.12em;color:var(--ink3)}
+.field{width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14.5px}
+textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.5;resize:vertical}
+.btn{background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:13.5px;font-weight:500;text-align:center}
+.btn:active{background:var(--line)}
+.btn.pri{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
+.btnrow{display:flex;gap:8px}
+.btnrow>*{flex:1}
+.note{font-size:12px;color:var(--ink3);line-height:1.7}
+.note b{color:var(--ink2);font-weight:700}
+.msg{font-size:12px;color:var(--ok);min-height:1.2em}
+
+/* ---- bottom nav ---- */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--bg);
+  background:color-mix(in srgb,var(--bg) 90%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);
+  padding:6px 0 calc(env(safe-area-inset-bottom) + 6px);
+}
+.navin{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--ink3);font-size:10px;letter-spacing:.04em}
+.tab svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--dawn)}
+
+/* ---- sheet ---- */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(10,8,20,.5);opacity:0;pointer-events:none;transition:opacity .22s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:41;
+  background:var(--bg);border-top:1px solid var(--line);
+  border-radius:20px 20px 0 0;
+  padding:16px 16px calc(env(safe-area-inset-bottom) + 18px);
+  transform:translateY(102%);transition:transform .26s cubic-bezier(.3,.9,.3,1);
+  max-height:88vh;overflow:auto;box-shadow:0 -12px 40px rgba(10,8,20,.28);
+}
+.sheet.on{transform:translateY(0)}
+.sheetin{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:13px}
+.grab{width:36px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 2px}
+.sheettitle{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:17px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);background:var(--bg2);border-radius:99px;padding:6px 13px;font-size:13px;color:var(--ink2)}
+.pill.on{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.day{border:1px solid var(--line);background:var(--bg2);border-radius:9px;padding:7px 0;font-size:12.5px;text-align:center;color:var(--ink2)}
+.day.on{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}
+.timerow{display:flex;gap:8px;align-items:center}
+.timerow input[type=time]{flex:1}
+
+/* ---- level up ---- */
+.levelup{
+  position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;
+  opacity:0;transition:opacity .3s;
+  background:radial-gradient(60% 40% at 50% 50%,color-mix(in srgb,var(--dawn) 30%,transparent),transparent 70%);
+}
+.levelup.on{opacity:1}
+.lucard{text-align:center;transform:scale(.9);transition:transform .4s cubic-bezier(.2,1.3,.4,1)}
+.levelup.on .lucard{transform:scale(1)}
+.lulab{font-size:12px;letter-spacing:.4em;color:var(--dawn)}
+.lubig{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:52px;line-height:1.1;
+  background:linear-gradient(135deg,var(--night),var(--dusk),var(--dawn));-webkit-background-clip:text;background-clip:text;color:transparent;
+  font-variant-numeric:tabular-nums}
+.lusub{font-size:13px;color:var(--ink2);margin-top:2px}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">セレスティア</div>
+    <div class="topdate" id="topdate"></div>
+  </header>
+
+  <main>
+    <!-- HOME -->
+    <section class="view on" id="v-home">
+      <div class="hero">
+        <div class="heroTop">
+          <div class="halo">
+            <svg class="ring" viewBox="0 0 104 104" aria-hidden="true">
+              <defs><linearGradient id="haloGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop class="gs1" offset="0"/><stop class="gs2" offset=".5"/><stop class="gs3" offset="1"/>
+              </linearGradient></defs>
+              <circle class="rbg" cx="52" cy="52" r="47"/>
+              <circle class="rfill" id="ringfill" cx="52" cy="52" r="47" stroke-dasharray="295.3" stroke-dashoffset="295.3"/>
+            </svg>
+            <div class="face" id="face"><span class="rune">セ</span></div>
+          </div>
+          <div class="who">
+            <div class="cname" id="cname">セレスティア</div>
+            <div class="rank" id="rank">見習い天使</div>
+            <div class="lvrow"><span class="lvlab">LV</span><span class="lvnum" id="lvnum">1</span></div>
+          </div>
+        </div>
+        <div class="bar">
+          <div class="barmeta"><span id="expnow">0 EXP</span><span id="expneed">次のレベルまで 50</span></div>
+        </div>
+        <div class="today">
+          <div class="stat"><b id="s-done">0</b><span>きょう達成</span></div>
+          <div class="stat"><b id="s-left">0</b><span>のこり</span></div>
+          <div class="stat"><b id="s-fire">0</b><span>最長れんぞく</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sechead">
+          <div class="sectitle">きょうのミッション</div>
+          <button class="addbtn" id="addMission">＋ 追加</button>
+        </div>
+        <div id="missionList"></div>
+      </div>
+
+      <div class="sec" id="todayEventsSec" hidden>
+        <div class="sechead"><div class="sectitle">きょうの予定</div></div>
+        <div id="todayEvents"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sechead"><div class="sectitle">きょう以外のミッション</div></div>
+        <div id="otherMissions"></div>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="view" id="v-cal">
+      <div class="calhead">
+        <button class="navb" id="prevM" aria-label="前の月"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div class="calmon" id="calmon"></div>
+        <button class="navb" id="nextM" aria-label="次の月"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+      <div>
+        <div class="grid" id="dowRow"></div>
+        <div class="grid" id="calGrid" style="margin-top:4px"></div>
+      </div>
+      <div class="note">枠の下のバーは、その日のミッション達成ぐあい。点は予定あり。日付をタップすると中身が見られます。</div>
+    </section>
+
+    <!-- LIST -->
+    <section class="view" id="v-list">
+      <div class="sec">
+        <div class="sechead"><div class="sectitle">やることリスト</div></div>
+        <div class="addline">
+          <input id="todoInput" placeholder="やることを書く" enterkeyhint="done">
+          <button id="todoAdd">追加</button>
+        </div>
+        <div id="todoOpen"></div>
+        <div class="donehead" id="todoDoneHead" hidden>おわったもの</div>
+        <div id="todoDone"></div>
+      </div>
+      <div class="note">1つ終えるごとに +5 EXP。単発の用事はこちら、毎日くり返すものはミッションへ。</div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-set">
+      <div class="card">
+        <div class="lab">キャラクター</div>
+        <input class="field" id="setName" placeholder="キャラの名前">
+        <div class="btnrow">
+          <label class="btn" for="imgInput">画像をえらぶ</label>
+          <button class="btn" id="imgClear">画像を消す</button>
+        </div>
+        <input type="file" id="imgInput" accept="image/*" hidden>
+        <div class="note">正方形に切り取って小さく保存します。ibisPaintで描いた絵をそのまま使えます。</div>
+      </div>
+
+      <div class="card">
+        <div class="lab">ホーム画面に置く</div>
+        <div class="note">Safariでこのページを開く → 下の<b>共有ボタン</b> → <b>ホーム画面に追加</b>。次からはアプリのように全画面で開きます。中身を更新しても置き直しは不要です。</div>
+        <div class="note" id="swState">オフライン対応：確認中…</div>
+      </div>
+
+      <div class="card">
+        <div class="lab">バックアップ</div>
+        <div class="note">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div>
+        <textarea class="field" id="backup" readonly></textarea>
+        <div class="btnrow">
+          <button class="btn" id="copyBk">コピー</button>
+          <button class="btn" id="showRestore">読みこむ</button>
+        </div>
+        <div id="restoreBox" hidden style="display:flex;flex-direction:column;gap:8px">
+          <textarea class="field" id="restoreIn" placeholder="バックアップの文字をここに貼る"></textarea>
+          <button class="btn pri" id="doRestore">この内容で上書きする</button>
+        </div>
+        <div class="msg" id="setMsg"></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">やりなおし</div>
+        <button class="btn danger" id="wipe">ぜんぶ消して最初から</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<nav class="nav">
+  <div class="navin">
+    <button class="tab on" data-v="home"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg>ホーム</button>
+    <button class="tab" data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>カレンダー</button>
+    <button class="tab" data-v="list"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 1.5-2M4 12l1 1 1.5-2M4 18l1 1 1.5-2"/></svg>リスト</button>
+    <button class="tab" data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"/></svg>設定</button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- mission sheet -->
+<div class="sheet" id="sheetM">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="mTitle">ミッションを追加</div>
+    <input class="field" id="mName" placeholder="例：6時に起きる">
+    <div>
+      <div class="lab" style="margin-bottom:6px">もらえるEXP</div>
+      <div class="pills" id="mExp">
+        <button class="pill" data-e="10">かるい 10</button>
+        <button class="pill on" data-e="20">ふつう 20</button>
+        <button class="pill" data-e="30">たいへん 30</button>
+      </div>
+    </div>
+    <div>
+      <div class="lab" style="margin-bottom:6px">くり返す曜日</div>
+      <div class="days" id="mDays"></div>
+    </div>
+    <div>
+      <div class="lab" style="margin-bottom:6px">時間のしばり</div>
+      <div class="pills" id="mMode">
+        <button class="pill on" data-m="">なし</button>
+        <button class="pill" data-m="before">この時刻まで</button>
+        <button class="pill" data-m="after">この時刻から</button>
+      </div>
+      <div class="timerow" id="mTimeRow" style="margin-top:8px" hidden>
+        <input class="field" type="time" id="mTime" value="06:00">
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="mCancel">やめる</button>
+      <button class="btn pri" id="mSave">保存する</button>
+    </div>
+    <button class="btn danger" id="mDelete" hidden>このミッションを消す</button>
+  </div>
+</div>
+
+<!-- day sheet -->
+<div class="sheet" id="sheetD">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="dTitle">日付</div>
+    <div>
+      <div class="lab" style="margin-bottom:6px">予定</div>
+      <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="timerow">
+      <input class="field" id="dEvName" placeholder="予定を書く" style="flex:2">
+      <input class="field" type="time" id="dEvTime" style="flex:1">
+    </div>
+    <button class="btn pri" id="dEvAdd">予定を足す</button>
+    <div>
+      <div class="lab" style="margin-bottom:6px">この日のミッション</div>
+      <div id="dMissions" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <button class="btn" id="dClose">とじる</button>
+  </div>
+</div>
+
+<div class="levelup" id="levelup">
+  <div class="lucard">
+    <div class="lulab">LEVEL UP</div>
+    <div class="lubig" id="luNum">2</div>
+    <div class="lusub" id="luSub"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const LS = "questlog.v1";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const pad = n => String(n).padStart(2, "0");
+const keyOf = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+
+/* ---------- state ---------- */
+function seed() {
+  return {
+    v: 1,
+    chara: { name: "セレスティア", img: null, level: 1, exp: 0 },
+    missions: [
+      { id: uid(), title: "6時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "06:00" },
+      { id: uid(), title: "ストレッチをする", exp: 10, days: [0,1,2,3,4,5,6], mode: "", time: "" },
+      { id: uid(), title: "コードを書く", exp: 20, days: [1,2,3,4,5], mode: "", time: "" }
+    ],
+    todos: [], events: {}, log: {}
+  };
+}
+let st;
+try {
+  const raw = localStorage.getItem(LS);
+  st = raw ? JSON.parse(raw) : seed();
+} catch (e) { st = seed(); }
+if (!st || !st.chara) st = seed();
+st.missions = st.missions || []; st.todos = st.todos || [];
+st.events = st.events || {}; st.log = st.log || {};
+
+let saveWarned = false;
+function save() {
+  try { localStorage.setItem(LS, JSON.stringify(st)); }
+  catch (e) {
+    if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。画像が大きすぎるかもしれません。", true); }
+  }
+}
+function setMsg(t, bad) {
+  const m = $("#setMsg"); if (!m) return;
+  m.textContent = t; m.style.color = bad ? "var(--bad)" : "var(--ok)";
+  clearTimeout(setMsg.t); setMsg.t = setTimeout(() => { m.textContent = ""; }, 3200);
+}
+
+/* ---------- level ---------- */
+const need = lv => 50 + (lv - 1) * 25;
+function rankOf(lv) {
+  if (lv >= 50) return "熾天使";
+  if (lv >= 35) return "大天使";
+  if (lv >= 25) return "権天使";
+  if (lv >= 18) return "力天使";
+  if (lv >= 12) return "守護天使";
+  if (lv >= 6) return "翼を得し者";
+  return "見習い天使";
+}
+function addExp(n) {
+  const c = st.chara; c.exp += n; let up = 0;
+  while (c.exp >= need(c.level)) { c.exp -= need(c.level); c.level++; up++; }
+  while (c.exp < 0 && c.level > 1) { c.level--; c.exp += need(c.level); }
+  if (c.exp < 0) c.exp = 0;
+  if (up > 0) levelUp();
+}
+let luTimer = null;
+function levelUp() {
+  $("#luNum").textContent = st.chara.level;
+  $("#luSub").textContent = st.chara.name + " ／ " + rankOf(st.chara.level);
+  const el = $("#levelup"); el.classList.add("on");
+  clearTimeout(luTimer); luTimer = setTimeout(() => el.classList.remove("on"), 1900);
+}
+
+/* ---------- mission helpers ---------- */
+const doneOn = (id, k) => (st.log[k] || []).includes(id);
+function toggleDone(id, k, on) {
+  const arr = st.log[k] || (st.log[k] = []);
+  const i = arr.indexOf(id);
+  if (on && i < 0) arr.push(id);
+  if (!on && i >= 0) arr.splice(i, 1);
+  if (!arr.length) delete st.log[k];
+}
+function windowState(m, now) {
+  if (!m.mode || !m.time) return "ok";
+  const p = m.time.split(":");
+  const t = (+p[0]) * 60 + (+p[1]);
+  const cur = now.getHours() * 60 + now.getMinutes();
+  if (m.mode === "before") return cur <= t ? "ok" : "late";
+  if (m.mode === "after") return cur >= t ? "ok" : "early";
+  return "ok";
+}
+function streakOf(m) {
+  const d = new Date();
+  if (!doneOn(m.id, keyOf(d))) d.setDate(d.getDate() - 1);
+  let s = 0;
+  for (let i = 0; i < 400; i++) {
+    if (m.days.includes(d.getDay())) {
+      if (doneOn(m.id, keyOf(d))) s++; else break;
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  return s;
+}
+function daysLabel(m) {
+  if (m.days.length === 7) return "毎日";
+  if (m.days.length === 5 && [1,2,3,4,5].every(x => m.days.includes(x))) return "平日";
+  if (m.days.length === 2 && m.days.includes(0) && m.days.includes(6)) return "週末";
+  if (!m.days.length) return "曜日なし";
+  return m.days.slice().sort().map(x => DOW[x]).join("・");
+}
+const sortKey = m => (m.mode && m.time ? m.time : "99:99");
+
+/* ---------- render ---------- */
+function render() {
+  const now = new Date(), tk = keyOf(now);
+  $("#topdate").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日（" + DOW[now.getDay()] + "）";
+
+  // hero
+  const c = st.chara;
+  $("#cname").textContent = c.name || "セレスティア";
+  $("#rank").textContent = rankOf(c.level);
+  $("#lvnum").textContent = c.level;
+  const nd = need(c.level);
+  const C = 2 * Math.PI * 47;
+  const p = Math.max(0, Math.min(1, c.exp / nd));
+  $("#ringfill").setAttribute("stroke-dasharray", C.toFixed(1));
+  $("#ringfill").setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
+  $("#expnow").textContent = c.exp + " / " + nd + " EXP";
+  $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
+  const face = $("#face");
+  face.innerHTML = c.img
+    ? '<img src="' + c.img + '" alt="キャラクター">'
+    : '<span class="rune">' + esc((c.name || "セ")[0]) + "</span>";
+
+  // today's missions
+  const todays = st.missions.filter(m => m.days.includes(now.getDay()))
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.title.localeCompare(b.title, "ja"));
+  const doneCount = todays.filter(m => doneOn(m.id, tk)).length;
+  $("#s-done").textContent = doneCount;
+  $("#s-left").textContent = todays.length - doneCount;
+  $("#s-fire").textContent = st.missions.reduce((a, m) => Math.max(a, streakOf(m)), 0);
+
+  const ml = $("#missionList");
+  ml.innerHTML = todays.length
+    ? todays.map(m => missionRow(m, tk, now)).join("")
+    : '<div class="empty">今日のミッションはありません。<br>「＋ 追加」から作れます。</div>';
+  ml.style.display = "flex"; ml.style.flexDirection = "column"; ml.style.gap = "9px";
+
+  const others = st.missions.filter(m => !m.days.includes(now.getDay()));
+  const ol = $("#otherMissions");
+  ol.parentElement.hidden = others.length === 0;
+  ol.innerHTML = others.map(m => missionRow(m, tk, now, true)).join("");
+  ol.style.display = "flex"; ol.style.flexDirection = "column"; ol.style.gap = "9px";
+
+  // today's events
+  const ev = (st.events[tk] || []).slice().sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  $("#todayEventsSec").hidden = ev.length === 0;
+  $("#todayEvents").innerHTML = ev.map(e =>
+    '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + '</div>' +
+    (e.time ? '<div class="chips"><span class="chip time">' + esc(e.time) + "</span></div>" : "") +
+    "</div></div>").join("");
+  $("#todayEvents").style.display = "flex"; $("#todayEvents").style.flexDirection = "column"; $("#todayEvents").style.gap = "9px";
+
+  renderTodos();
+  renderCal();
+  if ($("#setName").value !== (c.name || "")) $("#setName").value = c.name || "";
+  if (document.activeElement !== $("#backup")) $("#backup").value = JSON.stringify(st);
+}
+
+function missionRow(m, tk, now, dim) {
+  const done = doneOn(m.id, tk);
+  const w = dim ? "ok" : windowState(m, now);
+  const s = streakOf(m);
+  const chips = [];
+  chips.push('<span class="chip">' + esc(daysLabel(m)) + "</span>");
+  if (m.mode && m.time) {
+    const lab = m.mode === "before" ? "〜" + m.time + " まで" : m.time + " から";
+    const cls = (!done && w === "late") ? "chip late" : "chip time";
+    chips.push('<span class="' + cls + '">' + esc(lab) + (!done && w === "late" ? "・時間切れ" : "") + "</span>");
+  }
+  if (s > 1) chips.push('<span class="chip fire">' + s + "日れんぞく</span>");
+  const cls = "row" + (done ? " done" : "") + ((!done && w !== "ok") || dim ? " locked" : "");
+  return '<div class="' + cls + '" data-m="' + m.id + '">' +
+    '<button class="check" data-act="toggle" data-id="' + m.id + '" aria-label="達成"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' +
+    '<div class="rowbody"><div class="rowtitle">' + esc(m.title) + "</div>" +
+    '<div class="chips">' + chips.join("") + "</div></div>" +
+    '<span class="expbadge">+' + m.exp + "</span>" +
+    '<button class="edit" data-act="edit" data-id="' + m.id + '" aria-label="編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
+    "</div>";
+}
+
+function renderTodos() {
+  const open = st.todos.filter(t => !t.done), done = st.todos.filter(t => t.done);
+  const row = (t, isDone) =>
+    '<div class="row' + (isDone ? " strike" : "") + '">' +
+    '<button class="check' + (isDone ? "" : "") + '" data-act="todo" data-id="' + t.id + '" aria-label="完了"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>' +
+    '<div class="rowbody"><div class="rowtitle">' + esc(t.title) + "</div></div>" +
+    '<button class="del" data-act="todel" data-id="' + t.id + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button>' +
+    "</div>";
+  const o = $("#todoOpen"), d = $("#todoDone");
+  o.innerHTML = open.length ? open.map(t => row(t, false)).join("") : '<div class="empty">やることはありません。</div>';
+  d.innerHTML = done.map(t => row(t, true)).join("");
+  $("#todoDoneHead").hidden = done.length === 0;
+  [o, d].forEach(x => { x.style.display = "flex"; x.style.flexDirection = "column"; x.style.gap = "9px"; });
+  $$("#todoDone .row .check").forEach(b => b.parentElement.classList.add("done"));
+}
+
+let calY, calM;
+(function () { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); })();
+function renderCal() {
+  $("#calmon").textContent = calY + "年 " + (calM + 1) + "月";
+  $("#dowRow").innerHTML = DOW.map((d, i) =>
+    '<div class="dow ' + (i === 0 ? "n" : i === 6 ? "s" : "") + '">' + d + "</div>").join("");
+  const first = new Date(calY, calM, 1), last = new Date(calY, calM + 1, 0);
+  const tk = keyOf(new Date());
+  let html = "";
+  for (let i = 0; i < first.getDay(); i++) html += '<div class="cell pad"></div>';
+  for (let day = 1; day <= last.getDate(); day++) {
+    const d = new Date(calY, calM, day), k = keyOf(d);
+    const sched = st.missions.filter(m => m.days.includes(d.getDay()));
+    const doneN = sched.filter(m => doneOn(m.id, k)).length;
+    const ratio = sched.length ? doneN / sched.length : 0;
+    const hasEv = (st.events[k] || []).length > 0;
+    html += '<button class="cell' + (k === tk ? " now" : "") + '" data-act="day" data-k="' + k + '">' +
+      '<span class="d">' + day + "</span>" +
+      (hasEv ? '<span class="dot"></span>' : "") +
+      (doneN ? '<span class="mini"><i style="width:' + Math.round(ratio * 100) + '%"></i></span>' : "") +
+      "</button>";
+  }
+  $("#calGrid").innerHTML = html;
+}
+
+/* ---------- sheets ---------- */
+function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); }
+function closeSheets() {
+  $("#scrim").classList.remove("on");
+  $("#sheetM").classList.remove("on"); $("#sheetD").classList.remove("on");
+}
+$("#scrim").addEventListener("click", closeSheets);
+
+/* mission editor */
+let editing = null, draft = null;
+$("#mDays").innerHTML = DOW.map((d, i) => '<button class="day" data-d="' + i + '">' + d + "</button>").join("");
+function paintDraft() {
+  $("#mName").value = draft.title;
+  $$("#mExp .pill").forEach(p => p.classList.toggle("on", +p.dataset.e === draft.exp));
+  $$("#mDays .day").forEach(p => p.classList.toggle("on", draft.days.includes(+p.dataset.d)));
+  $$("#mMode .pill").forEach(p => p.classList.toggle("on", p.dataset.m === (draft.mode || "")));
+  $("#mTimeRow").hidden = !draft.mode;
+  $("#mTime").value = draft.time || "06:00";
+}
+function openMission(m) {
+  editing = m ? m.id : null;
+  draft = m ? { title: m.title, exp: m.exp, days: m.days.slice(), mode: m.mode || "", time: m.time || "" }
+            : { title: "", exp: 20, days: [0,1,2,3,4,5,6], mode: "", time: "" };
+  $("#mTitle").textContent = m ? "ミッションを編集" : "ミッションを追加";
+  $("#mDelete").hidden = !m;
+  paintDraft(); openSheet("#sheetM");
+}
+$("#addMission").addEventListener("click", () => openMission(null));
+$("#mExp").addEventListener("click", e => { const b = e.target.closest(".pill"); if (!b) return; draft.exp = +b.dataset.e; paintDraft(); });
+$("#mDays").addEventListener("click", e => {
+  const b = e.target.closest(".day"); if (!b) return;
+  const d = +b.dataset.d, i = draft.days.indexOf(d);
+  if (i < 0) draft.days.push(d); else draft.days.splice(i, 1);
+  paintDraft();
+});
+$("#mMode").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  draft.mode = b.dataset.m; if (draft.mode && !draft.time) draft.time = "06:00";
+  paintDraft();
+});
+$("#mTime").addEventListener("change", e => { draft.time = e.target.value; });
+$("#mName").addEventListener("input", e => { draft.title = e.target.value; });
+$("#mCancel").addEventListener("click", closeSheets);
+$("#mSave").addEventListener("click", () => {
+  const t = draft.title.trim();
+  if (!t) { $("#mName").focus(); return; }
+  if (!draft.days.length) draft.days = [0,1,2,3,4,5,6];
+  if (editing) {
+    const m = st.missions.find(x => x.id === editing);
+    Object.assign(m, { title: t, exp: draft.exp, days: draft.days, mode: draft.mode, time: draft.mode ? draft.time : "" });
+  } else {
+    st.missions.push({ id: uid(), title: t, exp: draft.exp, days: draft.days, mode: draft.mode, time: draft.mode ? draft.time : "" });
+  }
+  save(); render(); closeSheets();
+});
+let delArm = false;
+$("#mDelete").addEventListener("click", e => {
+  if (!delArm) { delArm = true; e.target.textContent = "もう一度おすと消えます"; setTimeout(() => { delArm = false; e.target.textContent = "このミッションを消す"; }, 3000); return; }
+  st.missions = st.missions.filter(m => m.id !== editing);
+  Object.keys(st.log).forEach(k => { st.log[k] = st.log[k].filter(id => id !== editing); if (!st.log[k].length) delete st.log[k]; });
+  delArm = false; e.target.textContent = "このミッションを消す";
+  save(); render(); closeSheets();
+});
+
+/* day sheet */
+let dayKey = null;
+function openDay(k) {
+  dayKey = k;
+  const [y, m, d] = k.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  $("#dTitle").textContent = m + "月" + d + "日（" + DOW[dt.getDay()] + "）";
+  paintDay(); $("#dEvName").value = ""; $("#dEvTime").value = "";
+  openSheet("#sheetD");
+}
+function paintDay() {
+  const k = dayKey, [y, mo, d] = k.split("-").map(Number);
+  const dt = new Date(y, mo - 1, d);
+  const ev = (st.events[k] || []).slice().sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  $("#dEvents").innerHTML = ev.length ? ev.map(e =>
+    '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
+    (e.time ? '<div class="chips"><span class="chip time">' + esc(e.time) + "</span></div>" : "") + "</div>" +
+    '<button class="del" data-act="evdel" data-id="' + e.id + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></div>'
+  ).join("") : '<div class="empty">予定なし</div>';
+
+  const sched = st.missions.filter(m => m.days.includes(dt.getDay()));
+  $("#dMissions").innerHTML = sched.length ? sched.map(m => {
+    const done = doneOn(m.id, k);
+    return '<div class="row' + (done ? " done" : "") + '">' +
+      '<div class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+      '<div class="rowbody"><div class="rowtitle">' + esc(m.title) + "</div></div>" +
+      '<span class="expbadge">' + (done ? "達成" : "—") + "</span></div>";
+  }).join("") : '<div class="empty">この曜日のミッションはありません</div>';
+}
+$("#dEvAdd").addEventListener("click", () => {
+  const t = $("#dEvName").value.trim(); if (!t) return;
+  (st.events[dayKey] || (st.events[dayKey] = [])).push({ id: uid(), title: t, time: $("#dEvTime").value });
+  $("#dEvName").value = ""; $("#dEvTime").value = "";
+  save(); paintDay(); renderCal(); render();
+});
+$("#dClose").addEventListener("click", closeSheets);
+$("#dEvents").addEventListener("click", e => {
+  const b = e.target.closest('[data-act="evdel"]'); if (!b) return;
+  st.events[dayKey] = (st.events[dayKey] || []).filter(x => x.id !== b.dataset.id);
+  if (!st.events[dayKey].length) delete st.events[dayKey];
+  save(); paintDay(); renderCal(); render();
+});
+
+/* ---------- global clicks ---------- */
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id;
+  if (act === "toggle") {
+    const m = st.missions.find(x => x.id === id); if (!m) return;
+    const now = new Date(), tk = keyOf(now);
+    const done = doneOn(m.id, tk);
+    if (!done) {
+      if (!m.days.includes(now.getDay())) { return; }
+      const w = windowState(m, now);
+      if (w !== "ok") { flash(b); return; }
+      toggleDone(m.id, tk, true); addExp(m.exp);
+    } else { toggleDone(m.id, tk, false); addExp(-m.exp); }
+    save(); render();
+  }
+  if (act === "edit") { const m = st.missions.find(x => x.id === id); if (m) openMission(m); }
+  if (act === "todo") {
+    const t = st.todos.find(x => x.id === id); if (!t) return;
+    t.done = !t.done; addExp(t.done ? 5 : -5); save(); render();
+  }
+  if (act === "todel") { st.todos = st.todos.filter(x => x.id !== id); save(); render(); }
+  if (act === "day") { openDay(b.dataset.k); }
+});
+function flash(el) {
+  const row = el.closest(".row"); if (!row) return;
+  row.animate([{ transform: "translateX(0)" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "translateX(0)" }], { duration: 260 });
+}
+
+/* ---------- tabs ---------- */
+$$(".tab").forEach(t => t.addEventListener("click", () => {
+  $$(".tab").forEach(x => x.classList.toggle("on", x === t));
+  $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
+  window.scrollTo(0, 0);
+  if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
+}));
+$("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
+$("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
+
+/* ---------- todos ---------- */
+function addTodo() {
+  const i = $("#todoInput"), t = i.value.trim(); if (!t) return;
+  st.todos.unshift({ id: uid(), title: t, done: false });
+  i.value = ""; save(); render();
+}
+$("#todoAdd").addEventListener("click", addTodo);
+$("#todoInput").addEventListener("keydown", e => { if (e.key === "Enter") addTodo(); });
+
+/* ---------- settings ---------- */
+$("#setName").addEventListener("input", e => { st.chara.name = e.target.value; save(); render(); });
+$("#imgInput").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const S = 400, c = document.createElement("canvas");
+      c.width = c.height = S;
+      const s = Math.min(im.width, im.height), g = c.getContext("2d");
+      g.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, S, S);
+      st.chara.img = c.toDataURL("image/jpeg", 0.82);
+      save(); render(); setMsg("画像を設定しました");
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(f);
+  e.target.value = "";
+});
+$("#imgClear").addEventListener("click", () => { st.chara.img = null; save(); render(); });
+$("#copyBk").addEventListener("click", async () => {
+  const t = $("#backup");
+  try { await navigator.clipboard.writeText(t.value); setMsg("コピーしました"); }
+  catch (e) { t.removeAttribute("readonly"); t.select(); t.setSelectionRange(0, 999999); setMsg("選択しました。長押しでコピーしてください"); t.setAttribute("readonly", ""); }
+});
+$("#showRestore").addEventListener("click", () => { const b = $("#restoreBox"); b.hidden = !b.hidden; });
+$("#doRestore").addEventListener("click", () => {
+  try {
+    const o = JSON.parse($("#restoreIn").value);
+    if (!o || !o.chara) throw new Error("bad");
+    st = o; st.missions = st.missions || []; st.todos = st.todos || [];
+    st.events = st.events || {}; st.log = st.log || {};
+    save(); render(); setMsg("読みこみました");
+    $("#restoreIn").value = ""; $("#restoreBox").hidden = true;
+  } catch (e) { setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true); }
+});
+let wipeArm = false;
+$("#wipe").addEventListener("click", e => {
+  if (!wipeArm) { wipeArm = true; e.target.textContent = "本当に消す？ もう一度おす"; setTimeout(() => { wipeArm = false; e.target.textContent = "ぜんぶ消して最初から"; }, 3500); return; }
+  st = seed(); wipeArm = false; e.target.textContent = "ぜんぶ消して最初から";
+  save(); render(); setMsg("最初にもどしました");
+});
+
+/* ---------- boot ---------- */
+render();
+let lastDay = keyOf(new Date());
+setInterval(() => {
+  const k = keyOf(new Date());
+  if (k !== lastDay) { lastDay = k; const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); }
+  render();
+}, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+
+/* ---------- service worker ---------- */
+(function () {
+  const s = $("#swState");
+  if (!("serviceWorker" in navigator)) { s.textContent = "オフライン対応：この環境では使えません"; return; }
+  if (location.protocol === "file:") { s.textContent = "オフライン対応：ファイルを直接開いた状態では働きません（サーバー上でのみ有効）"; return; }
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    s.textContent = "オフライン対応：有効（電波がなくても開けます）";
+    reg.update();
+  }).catch(() => { s.textContent = "オフライン対応：登録できませんでした"; });
+})();
+</script>
+</body>
+</html>
