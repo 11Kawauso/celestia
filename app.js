@@ -19,14 +19,7 @@ function seed() {
     missions: [
       wakeMission(uid(), WAKE_DEFAULT)
     ],
-    goals: [
-      { id: uid(), title: "アプリを完成させる", due: "", done: false, doneAt: "",
-        steps: [
-          { id: uid(), title: "つくるものを決める", done: false },
-          { id: uid(), title: "画面をつくる", done: false },
-          { id: uid(), title: "公開する", done: false }
-        ] }
-    ],
+    goals: [],
     events: {}, log: {}, theme: "auto"
   };
 }
@@ -437,6 +430,8 @@ function renderCal() {
       (doneN ? '<span class="mini"><i style="width:' + Math.round(ratio * 100) + '%"></i></span>' : "") +
       "</button>";
   }
+  // 月によって行数が変わると下のヘルプボタンが動くので、いつも6行（42マス）にそろえる
+  for (let i = first.getDay() + last.getDate(); i < 42; i++) html += '<div class="cell pad"></div>';
   $("#calGrid").innerHTML = html;
 }
 

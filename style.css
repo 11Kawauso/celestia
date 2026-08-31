@@ -43,6 +43,24 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:6px}
 
+/* スクロールバーを自前のものにする。
+   端末の既定のままだと夜／昼のテーマから浮くため、配色にそろえる。
+   iPhone は普段この形の棒を出さないので、主にPCで見え方が変わる。 */
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink3) 45%,transparent) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb,var(--ink3) 45%,transparent);
+  border:3px solid transparent;background-clip:padding-box;border-radius:99px;
+}
+::-webkit-scrollbar-thumb:hover{
+  background:color-mix(in srgb,var(--ink3) 70%,transparent);background-clip:padding-box;
+}
+::-webkit-scrollbar-thumb:active{
+  background:var(--dawn);background-clip:padding-box;
+}
+::-webkit-scrollbar-corner{background:transparent}
+
 .wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
 .top{
   position:sticky;top:0;z-index:20;background:var(--bg);
@@ -187,7 +205,7 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .navb:active{background:var(--bg3)}
 .navb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.dow{text-align:center;font-size:10.5px;color:var(--ink3);padding:4px 0;letter-spacing:.05em}
+.dow{text-align:center;font-size:12.5px;color:var(--ink3);padding:5px 0;letter-spacing:.05em}
 .dow.sun{color:var(--sun)} .dow.sat{color:var(--sat)}
 .cell{
   aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
@@ -195,7 +213,7 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 }
 .cell.pad{background:transparent;border-color:transparent}
 .cell.now{border-color:var(--dawn);box-shadow:0 0 0 1px var(--dawn) inset}
-.cell .d{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.cell .d{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink2)}
 .cell .d.sun{color:var(--sun)}
 .cell .d.sat{color:var(--sat)}
 .cell.now .d{color:var(--dawn);font-weight:700}
