@@ -17,7 +17,7 @@ function seed() {
     chara: { level: 1, exp: 0 },
     user: "",
     missions: [
-      { id: uid(), title: "6時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "06:00" }
+      { id: uid(), title: "7時に起きる", exp: 20, days: [0,1,2,3,4,5,6], mode: "before", time: "07:00" }
     ],
     goals: [
       { id: uid(), title: "アプリを完成させる", due: "", done: false, doneAt: "",
@@ -418,7 +418,7 @@ function paintDraft() {
   $$("#mDays .day").forEach(p => p.classList.toggle("on", draft.days.includes(+p.dataset.d)));
   $$("#mMode .pill").forEach(p => p.classList.toggle("on", p.dataset.m === (draft.mode || "")));
   $("#mTimeRow").hidden = !draft.mode;
-  $("#mTime").value = draft.time || "06:00";
+  $("#mTime").value = draft.time || "07:00";
 }
 function openMission(m) {
   editing = m ? m.id : null;
@@ -438,7 +438,7 @@ $("#mDays").addEventListener("click", e => {
 });
 $("#mMode").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
-  draft.mode = b.dataset.m; if (draft.mode && !draft.time) draft.time = "06:00";
+  draft.mode = b.dataset.m; if (draft.mode && !draft.time) draft.time = "07:00";
   paintDraft();
 });
 $("#mTime").addEventListener("change", e => { draft.time = e.target.value; });
