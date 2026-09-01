@@ -1003,8 +1003,11 @@ if (window.matchMedia) {
    ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに合わせると、
    スクロールしても絵が一切動かない（ずれていると動きはじめに少しずれる）。 */
 function syncStageTop() {
+  const head = $(".top").offsetHeight;
   const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
-  document.documentElement.style.setProperty("--stageTop", ($(".top").offsetHeight + pad) + "px");
+  document.documentElement.style.setProperty("--stageTop", (head + pad) + "px");
+  // シートが止まる位置＝ヘッダーのすぐ下。ここから先は中身がシートの中で動く
+  document.documentElement.style.setProperty("--overlapTop", head + "px");
 }
 window.addEventListener("resize", syncStageTop);
 syncStageTop();
