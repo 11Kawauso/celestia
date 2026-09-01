@@ -109,7 +109,22 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .view.on{display:flex}
 
 /* ---- キャラ画像とセリフ ---- */
-.stage{display:flex;flex-direction:column;gap:12px}
+/* 絵とセリフはその場に留まり、下の中身がシートのように上に重なってくる。
+   --topH はヘッダーの実寸（app.js が入れる）。ノッチのぶん高さが変わるため。 */
+#v-home{gap:0}
+.stage{
+  display:flex;flex-direction:column;gap:12px;
+  position:sticky;top:var(--topH,45px);z-index:0;
+}
+.overlap{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;gap:18px;
+  margin:18px -16px 0;padding:18px 16px 0;      /* main の左右余白を打ち消して全幅に */
+  background:var(--bg);
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -14px 34px rgba(10,8,20,.5);
+  min-height:100vh;                              /* 絵を隠しきれるだけスクロールできるように */
+}
 .portrait{
   width:100%;aspect-ratio:3/4;max-height:52vh;
   border-radius:18px;overflow:hidden;

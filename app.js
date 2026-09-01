@@ -999,6 +999,13 @@ if (window.matchMedia) {
 }
 
 /* ---------- boot ---------- */
+/* ヘッダーの実寸を CSS に渡す。キャラ絵はこの高さで止まる。 */
+function syncTopH() {
+  document.documentElement.style.setProperty("--topH", $(".top").offsetHeight + "px");
+}
+window.addEventListener("resize", syncTopH);
+syncTopH();
+
 applyTheme();
 updateSpeech(new Date());
 render();
