@@ -63,6 +63,9 @@ function normalize(o) {
     exp: Math.max(0, Math.floor(asNum(c.exp, 0)))
   };
   o.user = asStr(o.user).slice(0, 40);
+  o.say = asStr(o.say);                      // 直前に言ったセリフ
+  const sd = asObj(o.said); o.said = {};     // 場面ごとに、最後に出した日
+  Object.keys(sd).forEach(k => { if (typeof sd[k] === "string") o.said[k] = sd[k]; });
   o.theme = ["auto", "dark", "light"].indexOf(o.theme) >= 0 ? o.theme : "auto";
 
   o.missions = asArr(o.missions).map(x => {
@@ -163,8 +166,7 @@ function addExp(n) {
 let luTimer = null;
 function levelUp() {
   $("#luNum").textContent = st.chara.level;
-  const you = (st.user || "").trim();
-  $("#luSub").textContent = (you ? you + "、おめでとう ／ " : CHARA + " ／ ") + rankOf(st.chara.level);
+  $("#luSub").textContent = callName(st.chara.level) + "、おめでとう ／ " + rankOf(st.chara.level);
   const el = $("#levelup"); el.classList.add("on");
   clearTimeout(luTimer); luTimer = setTimeout(() => el.classList.remove("on"), 1900);
 }
@@ -277,25 +279,170 @@ function holidaysOf(y) {
 const holidayName = d => holidaysOf(d.getFullYear())[(d.getMonth() + 1) + "-" + d.getDate()] || "";
 
 /* ---------- セリフ ---------- */
-/* 早起きミッションの状態と時間帯で言うことを変える。
-   文面を変えたいときはこの関数だけ直せばよい。 */
-function speechText(now) {
+/* レベル＝親密度。上がるほど呼び方と口調がやわらぐ。
+   区切りは rankOf のランクの境目にそろえてある。
+     0: Lv1-5   見習い天使            「お前」・ぶっきらぼう
+     1: Lv6-17  翼を得し者／守護天使  「あんた」・少し丸い
+     2: Lv18-34 力天使／権天使        名前で呼ぶ・素直
+     3: Lv35-   大天使／熾天使        「ご主人様」・丁寧
+   文面を変えたいときは下の SPEECH だけ直せばよい。{you} は呼び方、{n} は残りの数。 */
+function toneOf(lv) { return lv >= 35 ? 3 : lv >= 18 ? 2 : lv >= 6 ? 1 : 0; }
+function callName(lv) {
   const you = (st.user || "").trim();
-  const call = you ? you + "、" : "";
+  const t = toneOf(lv);
+  if (t === 3) return "ご主人様";
+  if (t === 2) return you || "あんた";   // 名前が未設定なら前の段階の呼び方
+  if (t === 1) return "あんた";
+  return "お前";
+}
+/* しゃべる場面。押した瞬間に出るものと、アプリを開いたときに出るものがある。
+   開いたときに出るものは「その日はじめて条件を満たしたとき」に一度だけ。
+   重なった日は、この並びの上にあるものだけが出る（並べ替えれば優先順が変わる）。 */
+const OPEN_SCENES = [
+  "wakeLate",   // 2 早起きが時間切れになってから、はじめて開いた
+  "night",      // 4 21時〜0時に、はじめて開いた
+  "midnight",   // 5 1時〜5時に、はじめて開いた
+  "holiday"     // 7 土日・祝日に、はじめて開いた
+];
+
+/* セリフ表。口調4段階 × 場面。
+   ・各場面は配列。いくつ足してもよく、その中から1つがランダムに選ばれる
+   ・{you} は呼び方（お前／あんた／名前／ご主人様）、{n} は残りの数に置きかわる
+   ・場面のキー
+       first        はじめてアプリを開いたとき（1度だけ）
+       wakeClaim    1 早起きの報酬を受け取った
+       missionClaim 3 早起き以外の報酬を受け取った
+       goalDone     6 目標を達成した
+       wakeLate     2 早起きが時間切れ
+       night        4 夜（21時〜0時）
+       midnight     5 夜中（1時〜5時）
+       holiday      7 土日・祝日
+       more         受け取りのセリフの後ろに足す（残りがあるときだけ） */
+const SPEECH = [
+  { /* 0 見習い天使（Lv1-5）：お前・ぶっきらぼう */
+    first:        ["……お前が私の主人か。まあいい、精々励め。",
+                   "ふん。私はセレスティア。お前のことは、まだ何も知らない。"],
+    wakeClaim:    ["ふん。今日はやったようだな。",
+                   "ほう、起きられたのか。……まあ、悪くない。"],
+    missionClaim: ["それくらいはできて当然だろう。",
+                   "ふん。持っていけ。"],
+    goalDone:     ["やり遂げたのか。……お前にしては上出来だ。",
+                   "ふん。まぐれではないと、証明してみせろ。"],
+    wakeLate:     ["また寝坊か。{you}に期待した私がばかだった。",
+                   "……もう間に合わん。明日はどうする気だ。"],
+    night:        ["今日はもう終わりだ。明日は起きろよ、{you}。",
+                   "夜だぞ。さっさと寝る支度をしろ。"],
+    midnight:     ["{you}、まだ起きているのか。いいかげんにしろ。",
+                   "こんな時間まで何をしている。寝ろ。"],
+    holiday:      ["今日は休みか。だからといって、だらけるなよ。",
+                   "休みだろうと朝は来る。分かっているな、{you}。"],
+    more:         ["あと{n}つ残ってるぞ。"] },
+
+  { /* 1 翼を得し者・守護天使（Lv6-17）：あんた・少し丸い */
+    first:        ["……ふうん。あんたが、私の主人ね。"],
+    wakeClaim:    ["今日も起きられたのね。……悪くないわ。",
+                   "おはよう。ほら、受け取っていきなさい。"],
+    missionClaim: ["ちゃんとやったのね。えらいじゃない。",
+                   "……まあ、こんなものかしら。はい、どうぞ。"],
+    goalDone:     ["やり切ったのね。ちょっと、見直したわ。",
+                   "……お疲れさま。今日はゆっくりしなさい。"],
+    wakeLate:     ["寝坊ね。まあ、{you}にしては頑張ってるほうかしら。",
+                   "間に合わなかったのね。……明日があるわ。"],
+    night:        ["おやすみ、{you}。明日はちゃんと起きるのよ。",
+                   "もう夜ね。そろそろ休みなさい。"],
+    midnight:     ["{you}、こんな時間まで起きてるの。体を壊すわよ。",
+                   "夜更かしはだめ。ほら、画面を閉じて。"],
+    holiday:      ["今日はお休みね。たまにはゆっくりしたら。",
+                   "休みだからって、朝寝坊は別の話よ。"],
+    more:         ["あと{n}つ残ってるわよ。"] },
+
+  { /* 2 力天使・権天使（Lv18-34）：名前で呼ぶ・素直 */
+    first:        ["{you}。これからよろしくね。"],
+    wakeClaim:    ["{you}、今日もちゃんと起きられたね。えらい。",
+                   "{you}、おはよう。今日も会えてうれしい。"],
+    missionClaim: ["{you}、よくやったね。",
+                   "きちんと続けてるね。……すごいと思う。"],
+    goalDone:     ["{you}、やったね。ずっと見てたよ。",
+                   "達成おめでとう。私も、うれしい。"],
+    wakeLate:     ["{you}、おはよう。……まあ、そんな日もあるよ。",
+                   "間に合わなかったね。無理はしないで。"],
+    night:        ["{you}、こんばんは。明日の朝、待ってるね。",
+                   "そろそろ休んで。おやすみ、{you}。"],
+    midnight:     ["{you}、まだ起きてるの？ 早く休んで。",
+                   "こんな時間まで……。心配になるよ。"],
+    holiday:      ["今日はお休みだね。{you}、何をして過ごすの？",
+                   "休みの日でも会いに来てくれるんだ。うれしい。"],
+    more:         ["あと{n}つ受け取れるよ。"] },
+
+  { /* 3 大天使・熾天使（Lv35-）：ご主人様・丁寧 */
+    first:        ["{you}。この身、あなたに捧げます。"],
+    wakeClaim:    ["{you}、今朝もご立派でした。",
+                   "{you}、おはようございます。報酬をお受け取りください。"],
+    missionClaim: ["{you}、見事でございます。",
+                   "さすがでございます。どうぞ、お納めください。"],
+    goalDone:     ["{you}、成し遂げられましたね。心よりお祝い申し上げます。",
+                   "あなたの歩みを、ずっと見ておりました。おめでとうございます。"],
+    wakeLate:     ["{you}、おはようございます。お疲れが出たのでしょう。",
+                   "今朝は間に合いませんでしたね。どうかお気になさらず。"],
+    night:        ["{you}、こんばんは。また明日の朝、お待ちしております。",
+                   "{you}、そろそろお休みください。"],
+    midnight:     ["{you}、まだ起きていらしたのですか。どうかお休みください。",
+                   "こんな時間まで……。お体に障ります。"],
+    holiday:      ["{you}、今日はお休みでございますね。ごゆるりとお過ごしください。",
+                   "お休みの日にもお会いできて、光栄でございます。"],
+    more:         ["あと{n}つ、お受け取りいただけます。"] }
+];
+
+/* いま条件を満たしていて、その日まだ出していない場面を、優先順に並べて返す。 */
+function scenesDue(now) {
   const w = st.missions.find(m => m.type === "wake");
-  const cs = w ? claimState(w, now, false) : "lock";
-  const h = now.getHours();
+  const h = now.getHours(), dow = now.getDay();
+  const due = {
+    wakeLate: !!w && claimState(w, now, false) === "late",
+    night:    h >= 21,               // 21時〜0時
+    midnight: h >= 1 && h < 5,       // 1時〜5時
+    holiday:  dow === 0 || dow === 6 || !!holidayName(now)
+  };
+  const today = keyOf(now);
+  return OPEN_SCENES.filter(k => due[k] && st.said[k] !== today);
+}
+/* セリフを1つ選んで覚える。次の場面が来るまでこれが出つづける。 */
+function say(scene, now, tail) {
+  const lv = st.chara.level;
+  const list = SPEECH[toneOf(lv)][scene];
+  if (!list || !list.length) return;
+  let line = list[Math.floor(Math.random() * list.length)] + (tail || "");
+  st.say = line.replace(/\{you\}/g, callName(lv));
+  st.said[scene] = keyOf(now);
+  save();
+}
+/* 受け取りのセリフに足す「あと◯つ」。残っていなければ空。 */
+function moreTail(now) {
   const left = st.missions
     .filter(m => m.days.includes(now.getDay()))
     .filter(m => claimState(m, now, false) === "ready").length;
-  const more = left ? "受け取れる報酬が " + left + " つ残っているよ。" : "";
-
-  if (cs === "lock")  return call + "こんばんは。まだ夜だね、ゆっくり休んで。";
-  if (cs === "ready") return call + "おはよう。報酬を受け取っていってね。";
-  if (cs === "done")  return call + "おはよう。今日もちゃんと起きられたね。" + more;
-  if (h < 12) return call + "おはよう。明日はもう少し早く会えるかな。" + more;
-  if (h < 18) return call + "こんにちは。今日はどんな一日？" + more;
-  return call + "こんばんは。明日の朝、また待ってるね。" + more;
+  if (!left) return "";
+  const l = SPEECH[toneOf(st.chara.level)].more;
+  if (!l || !l.length) return "";
+  return l[Math.floor(Math.random() * l.length)].replace("{n}", left);
+}
+/* アプリを開いたとき・時間がまたいだときに呼ぶ。 */
+function updateSpeech(now) {
+  const today = keyOf(now);
+  // はじめての起動。いま条件を満たしている場面も一緒に消化して、
+  // あいさつが直後に上書きされないようにする
+  if (!st.say) {
+    say("first", now);
+    scenesDue(now).forEach(k => { st.said[k] = today; });
+    save();
+    return;
+  }
+  const due = scenesDue(now);
+  if (!due.length) return;
+  say(due[0], now);
+  // 同時に重なっていた下位の場面も、その日はもう出さない
+  due.forEach(k => { st.said[k] = today; });
+  save();
 }
 
 /* ---------- render ---------- */
@@ -320,7 +467,7 @@ function render() {
   $("#portrait").innerHTML = CHARA_IMG
     ? '<img src="' + esc(CHARA_IMG) + '" alt="' + CHARA + '">'
     : '<span class="rune">' + CHARA[0] + "</span>";
-  $("#speech").textContent = speechText(now);
+  $("#speech").textContent = st.say;
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
@@ -620,6 +767,7 @@ document.addEventListener("click", e => {
     const now = new Date();
     if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
     toggleDone(m.id, keyOf(now), true); addExp(m.exp);   // 受け取ったら取り消せない
+    say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
     save(); render();
   }
   if (act === "edit") { const m = st.missions.find(x => x.id === id); if (m) openMission(m); }
@@ -632,6 +780,7 @@ document.addEventListener("click", e => {
   if (act === "gdone") {
     const g = st.goals.find(x => x.id === id); if (!g) return;
     g.done = !g.done; g.doneAt = g.done ? keyOf(new Date()) : "";
+    if (g.done) say("goalDone", new Date());
     save(); render();
   }
   if (act === "day") { openDay(b.dataset.k); }
@@ -851,14 +1000,16 @@ if (window.matchMedia) {
 
 /* ---------- boot ---------- */
 applyTheme();
+updateSpeech(new Date());
 render();
 let lastDay = keyOf(new Date());
 setInterval(() => {
   const k = keyOf(new Date());
   if (k !== lastDay) { lastDay = k; const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); }
+  updateSpeech(new Date());
   render();
 }, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { updateSpeech(new Date()); render(); } });
 
 /* ---------- service worker ---------- */
 /* オフラインで開けるようにする。file: で直接開いたときは働かないので何もしない。 */
