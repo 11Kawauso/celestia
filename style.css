@@ -30,6 +30,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
 html,body{height:100%}
+/* スクロールバーの場所を常に空けておく。
+   中身は中央寄せなので、これが無いとスクロールするタブ（ホーム）と
+   しないタブ（目標など）で左右にずれてしまう。
+   iPhone のようにバーが重ねて出る環境では何も起きない。 */
+html{scrollbar-gutter:stable}
 body{
   background:var(--bg); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
