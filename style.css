@@ -132,6 +132,10 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
   background:transparent;                        /* カードの隙間から後ろの絵を見せる */
   border-radius:22px 22px 0 0;                   /* 上限で切れるときの角を丸くする */
 }
+/* ここだけスクロールバーを出さない。動かせることは中身を見れば分かるので、
+   絵の上に棒が乗るほうが目ざわりになる。スクロール自体はできる。 */
+.overlap{scrollbar-width:none}
+.overlap::-webkit-scrollbar{display:none}
 /* 高さを決めた縦フレックスなので、これが無いと中身が縮められて
    カードがぺしゃんこになる。はみ出させてスクロールさせる。 */
 .overlap > *{flex:none}
