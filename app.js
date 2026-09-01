@@ -1005,9 +1005,12 @@ if (window.matchMedia) {
 function syncStageTop() {
   const head = $(".top").offsetHeight;
   const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
-  document.documentElement.style.setProperty("--stageTop", (head + pad) + "px");
-  // シートが止まる位置＝ヘッダーのすぐ下。ここから先は中身がシートの中で動く
-  document.documentElement.style.setProperty("--overlapTop", head + "px");
+  const stageTop = head + pad;
+  document.documentElement.style.setProperty("--stageTop", stageTop + "px");
+  // シートが止まる位置＝全体絵のまんなかあたり。ここから先は中身がシートの中で動く。
+  // 絵の上半分（顔まわり）はいつも見えたままになる。
+  const art = $("#portrait").offsetHeight;
+  document.documentElement.style.setProperty("--overlapTop", Math.round(stageTop + art / 2) + "px");
 }
 window.addEventListener("resize", syncStageTop);
 syncStageTop();

@@ -118,12 +118,13 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
   display:flex;flex-direction:column;gap:12px;
   position:sticky;top:var(--stageTop,61px);z-index:0;
 }
-/* シートはヘッダーの真下まで上がったら止まり、そこから先は中身が
-   シートの中でスクロールする。上限より上へはみ出したぶんは出さない。 */
+/* シートは全体絵のまんなかまで上がったら止まり、そこから先は中身が
+   シートの中でスクロールする。上限より上へはみ出したぶんは出さない。
+   --overlapTop は絵の実寸から app.js が入れる。 */
 .overlap{
-  position:sticky;top:var(--overlapTop,45px);z-index:1;
-  height:calc(100vh - var(--overlapTop,45px));
-  height:calc(100dvh - var(--overlapTop,45px));
+  position:sticky;top:var(--overlapTop,272px);z-index:1;
+  height:calc(100vh - var(--overlapTop,272px));
+  height:calc(100dvh - var(--overlapTop,272px));
   overflow-y:auto;
   display:flex;flex-direction:column;gap:18px;
   margin:18px -16px 0;                           /* main の左右余白を打ち消して全幅に */
