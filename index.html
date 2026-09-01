@@ -53,7 +53,9 @@
         <div class="bar">
           <div class="barmeta"><span id="expnow">0 EXP</span><span id="expneed">次のレベルまで 50</span></div>
         </div>
-        <div class="today">
+        <!-- いまは使わないので隠してある。hidden を消せばそのまま戻る
+             （app.js の render() は今も中身を更新しているので、追加の作業は要らない） -->
+        <div class="today" hidden>
           <div class="stat"><b id="s-done">0</b><span>きょう達成</span></div>
           <div class="stat"><b id="s-left">0</b><span>のこり</span></div>
           <div class="stat"><b id="s-fire">0</b><span>最長れんぞく</span></div>
