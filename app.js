@@ -863,6 +863,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   closePop();
   window.scrollTo(0, 0);
+  const ov = $(".overlap"); if (ov) ov.scrollTop = 0;   // シートの中も先頭へ
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
@@ -1002,6 +1003,7 @@ if (window.matchMedia) {
 /* キャラ絵が貼り付く位置を CSS に渡す。
    ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに合わせると、
    スクロールしても絵が一切動かない（ずれていると動きはじめに少しずれる）。 */
+let overlapTop = 0;   // シートが止まる位置。下の syncSheetScroll で使う
 function syncStageTop() {
   const head = $(".top").offsetHeight;
   const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
@@ -1010,8 +1012,18 @@ function syncStageTop() {
   // シートが止まる位置＝全体絵のまんなかあたり。ここから先は中身がシートの中で動く。
   // 絵の上半分（顔まわり）はいつも見えたままになる。
   const art = $("#portrait").offsetHeight;
-  document.documentElement.style.setProperty("--overlapTop", Math.round(stageTop + art / 2) + "px");
+  overlapTop = Math.round(stageTop + art / 2);
+  document.documentElement.style.setProperty("--overlapTop", overlapTop + "px");
 }
+
+/* シートが上限から降りたら、中のスクロールも先頭に戻す。
+   でないと「絵は見えているのに、カードの上だけ欠けている」状態が残ってしまう。 */
+function syncSheetScroll() {
+  const ov = $(".overlap");
+  if (!ov || !ov.scrollTop) return;
+  if (ov.getBoundingClientRect().top > overlapTop + 1) ov.scrollTop = 0;
+}
+window.addEventListener("scroll", syncSheetScroll, { passive: true });
 window.addEventListener("resize", syncStageTop);
 syncStageTop();
 
