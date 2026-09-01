@@ -110,11 +110,12 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 
 /* ---- キャラ画像とセリフ ---- */
 /* 絵とセリフはその場に留まり、下の中身がシートのように上に重なってくる。
-   --topH はヘッダーの実寸（app.js が入れる）。ノッチのぶん高さが変わるため。 */
+   --stageTop は絵の元の位置（app.js が実寸から入れる）。
+   ここに貼り付けるので、スクロールしても絵は動かない。 */
 #v-home{gap:0}
 .stage{
   display:flex;flex-direction:column;gap:12px;
-  position:sticky;top:var(--topH,45px);z-index:0;
+  position:sticky;top:var(--stageTop,61px);z-index:0;
 }
 .overlap{
   position:relative;z-index:1;

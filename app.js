@@ -999,12 +999,15 @@ if (window.matchMedia) {
 }
 
 /* ---------- boot ---------- */
-/* ヘッダーの実寸を CSS に渡す。キャラ絵はこの高さで止まる。 */
-function syncTopH() {
-  document.documentElement.style.setProperty("--topH", $(".top").offsetHeight + "px");
+/* キャラ絵が貼り付く位置を CSS に渡す。
+   ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに合わせると、
+   スクロールしても絵が一切動かない（ずれていると動きはじめに少しずれる）。 */
+function syncStageTop() {
+  const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
+  document.documentElement.style.setProperty("--stageTop", ($(".top").offsetHeight + pad) + "px");
 }
-window.addEventListener("resize", syncTopH);
-syncTopH();
+window.addEventListener("resize", syncStageTop);
+syncStageTop();
 
 applyTheme();
 updateSpeech(new Date());
