@@ -129,9 +129,8 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
   display:flex;flex-direction:column;gap:18px;
   margin:18px -16px 0;                           /* main の左右余白を打ち消して全幅に */
   padding:18px 16px calc(env(safe-area-inset-bottom) + 96px);
-  background:var(--bg);
-  border-radius:22px 22px 0 0;
-  box-shadow:0 -14px 34px rgba(10,8,20,.5);
+  background:transparent;                        /* カードの隙間から後ろの絵を見せる */
+  border-radius:22px 22px 0 0;                   /* 上限で切れるときの角を丸くする */
 }
 /* 高さを決めた縦フレックスなので、これが無いと中身が縮められて
    カードがぺしゃんこになる。はみ出させてスクロールさせる。 */
