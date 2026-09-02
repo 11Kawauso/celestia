@@ -180,10 +180,11 @@ body:has(#v-home.on){overflow:hidden}
     radial-gradient(120% 90% at 88% -20%,color-mix(in srgb,var(--dawn) 22%,transparent),transparent 60%),
     var(--bg2);
 }
-.heroTop{display:flex;gap:14px;align-items:center}
+.heroTop{display:flex;gap:18px;align-items:center}   /* 輪から出た光のぶん、名前を少し離す */
 .halo{position:relative;width:104px;height:104px;flex:none}
 .ring{position:absolute;inset:0;width:104px;height:104px;transform:rotate(-90deg);overflow:visible}
 .rbg{fill:none;stroke:var(--line);stroke-width:4}
+.spikes path{fill:var(--line)}   /* 輪の帯と同じ色にして、ひとつづきの飾りに見せる */
 .rfill{fill:none;stroke:url(#haloGrad);stroke-width:4;stroke-linecap:round;
   transition:stroke-dashoffset .55s cubic-bezier(.3,.8,.3,1);
   filter:drop-shadow(0 0 4px color-mix(in srgb,var(--dawn) 55%,transparent))}
