@@ -864,7 +864,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   closePop();
   window.scrollTo(0, 0);
   const ov = $(".overlap"); if (ov) ov.scrollTop = 0;   // シートの中も先頭へ
-  syncSheetScroll();                                    // 中のスクロールも掛け直す
+  if (t.dataset.v === "home") syncStageTop();           // 隠れている間は測れないので測り直す
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
@@ -1001,43 +1001,46 @@ if (window.matchMedia) {
 }
 
 /* ---------- boot ---------- */
-/* キャラ絵が貼り付く位置を CSS に渡す。
-   ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに合わせると、
-   スクロールしても絵が一切動かない（ずれていると動きはじめに少しずれる）。 */
-let overlapTop = 0;   // シートが止まる位置。下の syncSheetScroll で使う
+/* 絵の位置と、シートの中身の「下駄」の高さを実寸から測って CSS に渡す。
+   --stageTop  ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに貼り付けるので、
+               スクロールしても絵は一切動かない（ずれていると動きはじめに少しずれる）。
+   --overlapTop 全体絵のまんなか。ここより上には、シートの中身を出さない。
+               絵の上半分（顔まわり）はいつも見えたままになる。
+   --sheetLead シートの中身が絵の下から始まるための、上の余白。
+               36 は「絵とシートのすきま 18 ＋ シートの内がわ 18」。 */
+let sheetLead = 0, overlapTop = 272;
 function syncStageTop() {
+  const art = $("#portrait").offsetHeight;
+  if (!art) return;                 // ホーム以外を見ているときは測れないので、そのまま残す
   const head = $(".top").offsetHeight;
   const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
   const stageTop = head + pad;
-  document.documentElement.style.setProperty("--stageTop", stageTop + "px");
-  // シートが止まる位置＝全体絵のまんなかあたり。ここから先は中身がシートの中で動く。
-  // 絵の上半分（顔まわり）はいつも見えたままになる。
-  const art = $("#portrait").offsetHeight;
+  const root = document.documentElement.style;
+  root.setProperty("--stageTop", stageTop + "px");
   overlapTop = Math.round(stageTop + art / 2);
-  document.documentElement.style.setProperty("--overlapTop", overlapTop + "px");
-}
+  root.setProperty("--overlapTop", overlapTop + "px");
 
-/* スクロールの順番をきめる。
-   まず画面全体が動いて、シートが上限（絵のまんなか）まで上がる。
-   そこに着いてはじめて、シートの中のスクロールを解禁する。
-   上限から降りているあいだは中を止め、先頭に戻す。でないと
-   「絵は見えているのに、カードの上だけ欠けている」状態が残ってしまう。 */
-function syncSheetScroll() {
+  const lead = Math.round(stageTop + $(".stage").offsetHeight + 36);
+  // セリフの行数が変わると下駄の高さも変わる。読んでいる途中に中身が飛ばないよう、
+  // 変わったぶんだけスクロール位置を押し戻しておく。
   const ov = $(".overlap");
-  if (!ov) return;
-  // 画面全体がこれ以上下がらないところまで来たか。
-  // 端末によって 100dvh と実際の高さが少しずれることがあるので、その保険も兼ねる
-  // （ずれたままだと、シートが上限に届かず中がずっと動かせなくなる）。
-  const doc = document.documentElement;
-  const atEnd = window.scrollY >= doc.scrollHeight - window.innerHeight - 1;
-  const stuck = atEnd || ov.getBoundingClientRect().top <= overlapTop + 1;
-  ov.classList.toggle("lock", !stuck);
-  if (!stuck && ov.scrollTop) ov.scrollTop = 0;
+  if (ov && sheetLead && ov.scrollTop) ov.scrollTop += lead - sheetLead;
+  sheetLead = lead;
+  root.setProperty("--sheetLead", lead + "px");
 }
-window.addEventListener("scroll", syncSheetScroll, { passive: true });
-window.addEventListener("resize", () => { syncStageTop(); syncSheetScroll(); });
+window.addEventListener("resize", syncStageTop);
+// セリフの行数や、あとから届いたフォントで絵まわりの高さが変わっても付いていく
+if (window.ResizeObserver) new ResizeObserver(syncStageTop).observe($(".stage"));
 syncStageTop();
-syncSheetScroll();
+
+/* 絵のまんなかより上へ流れていったカードは、mask で見えなくなっているだけで、
+   その場所にはまだ居る。見えていないボタンを押せてしまうと事故になるので、
+   その高さでの押し込みは、ここで飲みこむ。指でなぞる（スクロール）はそのまま効く。 */
+$(".overlap").addEventListener("click", e => {
+  if (!e.detail) return;                                                   // キーボードからの決定は素通し
+  const line = e.currentTarget.getBoundingClientRect().top + overlapTop;   // 消えはじめる高さ
+  if (e.clientY < line) { e.stopPropagation(); e.preventDefault(); }
+}, true);
 
 applyTheme();
 updateSpeech(new Date());

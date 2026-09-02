@@ -66,7 +66,7 @@ button{background:none;border:none;cursor:pointer}
 }
 ::-webkit-scrollbar-corner{background:transparent}
 
-.wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative}
 .top{
   position:sticky;top:0;z-index:20;background:var(--bg);
   background:color-mix(in srgb,var(--bg) 88%,transparent);
@@ -119,32 +119,36 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
    ここに貼り付けるので、スクロールしても絵は動かない。 */
 /* main の下余白（下タブぶん）はシートが自前で持つので、ホームでは打ち消す */
 #v-home{gap:0;margin-bottom:calc(-1 * (env(safe-area-inset-bottom) + 88px))}
+/* ホームで動くスクロールは、下のシートひとつだけ。画面そのものは動かさない。
+   ここが動くと、シートと画面の二重のスクロールに戻ってしまう。 */
+body:has(#v-home.on){overflow:hidden}
 .stage{
   display:flex;flex-direction:column;gap:12px;
   position:sticky;top:var(--stageTop,61px);z-index:0;
 }
-/* シートは全体絵のまんなかまで上がったら止まり、そこから先は中身が
-   シートの中でスクロールする。上限より上へはみ出したぶんは出さない。
-   --overlapTop は絵の実寸から app.js が入れる。 */
+/* シートは画面いっぱいの大きさで貼り付いていて、動くのはその中身だけ。
+   中身の上には --sheetLead ぶんの余白（絵ぶんの下駄）がある。指をすべらせると、
+   まずこの余白が減って中身が絵の上にせり上がり、そのまま続けて中身が流れていく。
+   絵のまんなか（--overlapTop）より上は mask で消してあるので、そこまで来た
+   中身は吸いこまれるように見えなくなる。見た目は前のままで、動きだけが
+   ひとつながりになる（前は画面とシートで別々のスクロールだった）。
+   ふたつの数字は絵の実寸から app.js が入れる。 */
 .overlap{
-  position:sticky;top:var(--overlapTop,272px);z-index:1;
-  height:calc(100vh - var(--overlapTop,272px));
-  height:calc(100dvh - var(--overlapTop,272px));
-  overflow-y:auto;
+  position:absolute;inset:0;z-index:1;           /* 本体（.wrap）にぴったり重ねる。
+                                                    画面ではなく本体を基準にするのは、PCの
+                                                    スクロールバーぶんだけ幅がずれないため */
+  overflow-y:auto;overscroll-behavior:contain;   /* 端まで来ても外へ引っぱらない */
+  scroll-padding-top:var(--overlapTop,272px);    /* キーボードで送った先が、消える所に入らないように */
   display:flex;flex-direction:column;gap:18px;
-  margin:18px -16px 0;                           /* main の左右余白を打ち消して全幅に */
-  padding:18px 16px calc(env(safe-area-inset-bottom) + 96px);
+  padding:var(--sheetLead,608px) 16px calc(env(safe-area-inset-bottom) + 96px);
   background:transparent;                        /* カードの隙間から後ろの絵を見せる */
-  border-radius:22px 22px 0 0;                   /* 上限で切れるときの角を丸くする */
+  -webkit-mask-image:linear-gradient(#0000 0 var(--overlapTop,272px),#000 var(--overlapTop,272px));
+  mask-image:linear-gradient(#0000 0 var(--overlapTop,272px),#000 var(--overlapTop,272px));
 }
 /* ここだけスクロールバーを出さない。動かせることは中身を見れば分かるので、
    絵の上に棒が乗るほうが目ざわりになる。スクロール自体はできる。 */
 .overlap{scrollbar-width:none}
 .overlap::-webkit-scrollbar{display:none}
-/* スクロールはひとつずつ。画面全体がまだ下まで行っていないあいだは、
-   シートの中を動かさない（この lock は app.js が付け外しする）。
-   これが無いと、指を置いた場所しだいで中と外のどちらが動くかが変わる。 */
-.overlap.lock{overflow-y:hidden}
 /* 高さを決めた縦フレックスなので、これが無いと中身が縮められて
    カードがぺしゃんこになる。はみ出させてスクロールさせる。 */
 .overlap > *{flex:none}
