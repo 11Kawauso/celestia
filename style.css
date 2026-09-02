@@ -176,14 +176,17 @@ body:has(#v-home.on){overflow:hidden}
 
 /* ---- character panel ---- */
 .hero{
-  background:var(--bg2);border:1px solid var(--line);border-radius:20px;
-  padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  border:1px solid var(--line);border-radius:20px;
+  padding:18px;box-shadow:var(--shadow);overflow:hidden;
 }
-.hero::before{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(120% 90% at 88% -20%,color-mix(in srgb,var(--dawn) 22%,transparent),transparent 60%);
+/* レベルのカードと、ホームのミッションのカードは同じ背景。
+   右上から金色の光が差しこむ。色みを変えたいときは 22% の数字を動かす。 */
+.hero,.secbox{
+  background:
+    radial-gradient(120% 90% at 88% -20%,color-mix(in srgb,var(--dawn) 22%,transparent),transparent 60%),
+    var(--bg2);
 }
-.heroTop{display:flex;gap:14px;align-items:center;position:relative}
+.heroTop{display:flex;gap:14px;align-items:center}
 .halo{position:relative;width:104px;height:104px;flex:none}
 .ring{position:absolute;inset:0;width:104px;height:104px;transform:rotate(-90deg);overflow:visible}
 .rbg{fill:none;stroke:var(--line);stroke-width:4}
@@ -204,23 +207,20 @@ body:has(#v-home.on){overflow:hidden}
 .lvrow{display:flex;align-items:baseline;gap:6px;margin-top:6px}
 .lvlab{font-size:11px;letter-spacing:.14em;color:var(--ink3)}
 .lvnum{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
-.bar{margin-top:14px;position:relative}
+.bar{margin-top:14px}
 .track{height:9px;border-radius:99px;background:var(--bg3);overflow:hidden;border:1px solid var(--line)}
 .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--night),var(--dusk),var(--dawn));transition:width .45s cubic-bezier(.3,.8,.3,1)}
 .barmeta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
-.today{display:flex;gap:8px;margin-top:14px;position:relative}
+.today{display:flex;gap:8px;margin-top:14px}
 .stat{flex:1;background:var(--bg3);border-radius:11px;padding:8px 10px;text-align:center}
 .stat b{display:block;font-size:17px;font-variant-numeric:tabular-nums;font-weight:700}
 .stat span{font-size:10.5px;color:var(--ink3);letter-spacing:.08em}
 
 /* ---- sections ---- */
 .sec{display:flex;flex-direction:column;gap:9px}
-/* ホームの各節を、もう一枚のカードで囲む。
-   完全な不透明にせず少し透かして、後ろの絵の気配を残す。
-   左右の余白が狭いのは、中のミッション行の幅を確保するため。
-   透け具合を変えたいときは 92% の数字を動かす（100% で完全な不透明）。 */
+/* ホームの各節を、もう一枚のカードで囲む。背景はレベルのカードと同じ（上の .hero,.secbox）。
+   左右の余白が狭いのは、中のミッション行の幅を確保するため。 */
 .secbox{
-  background:color-mix(in srgb,var(--bg) 92%,transparent);
   border:1px solid var(--line);border-radius:18px;
   padding:13px 8px;box-shadow:var(--shadow);
 }
