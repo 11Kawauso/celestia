@@ -184,7 +184,10 @@ body:has(#v-home.on){overflow:hidden}
 .halo{position:relative;width:104px;height:104px;flex:none}
 .ring{position:absolute;inset:0;width:104px;height:104px;transform:rotate(-90deg);overflow:visible}
 .rbg{fill:none;stroke:var(--line);stroke-width:4}
-.spikes path{fill:var(--dawn)}   /* ゲージと同じ金色。輪の帯ではなく、光の側の色にそろえる */
+/* 棘もゲージの一部。ふだんは輪の帯と同じ色で、光が自分の位置を通りすぎると金色になる。
+   どこで色が変わるかは index.html の data-at、切りかえは app.js の render()。 */
+.spikes path{fill:var(--line);transition:fill .5s ease}
+.spikes path.on{fill:var(--dawn)}
 .rfill{fill:none;stroke:url(#haloGrad);stroke-width:4;stroke-linecap:round;
   transition:stroke-dashoffset .55s cubic-bezier(.3,.8,.3,1);
   filter:drop-shadow(0 0 4px color-mix(in srgb,var(--dawn) 55%,transparent))}

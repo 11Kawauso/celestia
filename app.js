@@ -465,6 +465,8 @@ function render() {
   const p = Math.max(0, Math.min(1, c.exp / nd));
   $("#ringfill").setAttribute("stroke-dasharray", C.toFixed(1));
   $("#ringfill").setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
+  // 棘は、輪の光が自分の位置を通りすぎたぶんだけ金色になる（レベルが上がればまた消える）
+  $$(".spikes path").forEach(sp => sp.classList.toggle("on", p >= +sp.dataset.at));
   $("#expnow").textContent = c.exp + " / " + nd + " EXP";
   $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
 
