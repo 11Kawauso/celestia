@@ -141,6 +141,10 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
    絵の上に棒が乗るほうが目ざわりになる。スクロール自体はできる。 */
 .overlap{scrollbar-width:none}
 .overlap::-webkit-scrollbar{display:none}
+/* スクロールはひとつずつ。画面全体がまだ下まで行っていないあいだは、
+   シートの中を動かさない（この lock は app.js が付け外しする）。
+   これが無いと、指を置いた場所しだいで中と外のどちらが動くかが変わる。 */
+.overlap.lock{overflow-y:hidden}
 /* 高さを決めた縦フレックスなので、これが無いと中身が縮められて
    カードがぺしゃんこになる。はみ出させてスクロールさせる。 */
 .overlap > *{flex:none}

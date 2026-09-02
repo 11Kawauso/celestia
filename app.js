@@ -864,6 +864,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   closePop();
   window.scrollTo(0, 0);
   const ov = $(".overlap"); if (ov) ov.scrollTop = 0;   // シートの中も先頭へ
+  syncSheetScroll();                                    // 中のスクロールも掛け直す
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
@@ -1016,16 +1017,27 @@ function syncStageTop() {
   document.documentElement.style.setProperty("--overlapTop", overlapTop + "px");
 }
 
-/* シートが上限から降りたら、中のスクロールも先頭に戻す。
-   でないと「絵は見えているのに、カードの上だけ欠けている」状態が残ってしまう。 */
+/* スクロールの順番をきめる。
+   まず画面全体が動いて、シートが上限（絵のまんなか）まで上がる。
+   そこに着いてはじめて、シートの中のスクロールを解禁する。
+   上限から降りているあいだは中を止め、先頭に戻す。でないと
+   「絵は見えているのに、カードの上だけ欠けている」状態が残ってしまう。 */
 function syncSheetScroll() {
   const ov = $(".overlap");
-  if (!ov || !ov.scrollTop) return;
-  if (ov.getBoundingClientRect().top > overlapTop + 1) ov.scrollTop = 0;
+  if (!ov) return;
+  // 画面全体がこれ以上下がらないところまで来たか。
+  // 端末によって 100dvh と実際の高さが少しずれることがあるので、その保険も兼ねる
+  // （ずれたままだと、シートが上限に届かず中がずっと動かせなくなる）。
+  const doc = document.documentElement;
+  const atEnd = window.scrollY >= doc.scrollHeight - window.innerHeight - 1;
+  const stuck = atEnd || ov.getBoundingClientRect().top <= overlapTop + 1;
+  ov.classList.toggle("lock", !stuck);
+  if (!stuck && ov.scrollTop) ov.scrollTop = 0;
 }
 window.addEventListener("scroll", syncSheetScroll, { passive: true });
-window.addEventListener("resize", syncStageTop);
+window.addEventListener("resize", () => { syncStageTop(); syncSheetScroll(); });
 syncStageTop();
+syncSheetScroll();
 
 applyTheme();
 updateSpeech(new Date());
