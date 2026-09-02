@@ -372,6 +372,23 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   max-height:88vh;overflow:auto;box-shadow:0 -12px 40px rgba(10,8,20,.28);
 }
 .sheet.on{transform:translateY(0)}
+/* 日付の詳細だけは、下からではなく右からすべって出す。
+   画面いっぱいの別ページのあつかいなので、閉じるのは左上の×。 */
+.sheet.side{
+  top:0;max-height:none;
+  border-top:0;border-left:1px solid var(--line);border-radius:0;
+  padding-top:calc(env(safe-area-inset-top) + 14px);
+  transform:translateX(100%);
+  box-shadow:-12px 0 40px rgba(10,8,20,.28);
+}
+.sheet.side.on{transform:translateX(0)}
+.sidehead{display:flex;align-items:center;gap:11px}
+.xbtn{
+  width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;
+  color:var(--ink2);background:var(--bg3);border:1px solid var(--line);
+}
+.xbtn:active{background:var(--line)}
+.xbtn svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
 .sheetin{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:13px}
 .grab{width:36px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 2px}
 .sheettitle{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:17px}

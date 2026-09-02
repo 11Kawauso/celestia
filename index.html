@@ -216,11 +216,13 @@
   </div>
 </div>
 
-<!-- day sheet -->
-<div class="sheet" id="sheetD">
+<!-- day sheet（右からすべって出てくる詳細画面。閉じるのは左上の×） -->
+<div class="sheet side" id="sheetD">
   <div class="sheetin">
-    <div class="grab"></div>
-    <div class="sheettitle" id="dTitle">日付</div>
+    <div class="sidehead">
+      <button class="xbtn" id="dClose" aria-label="とじる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="sheettitle" id="dTitle">日付</div>
+    </div>
     <div>
       <div class="lab" style="margin-bottom:6px">予定</div>
       <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -237,7 +239,6 @@
       <div class="lab" style="margin-bottom:6px">この日が期限の目標</div>
       <div id="dGoals" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
-    <button class="btn" id="dClose">とじる</button>
   </div>
 </div>
 
