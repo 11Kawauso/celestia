@@ -754,6 +754,51 @@ $("#dEvents").addEventListener("click", e => {
   save(); paintDay(); renderCal(); render();
 });
 
+/* 指で右へなぞって閉じる。
+   始まりが画面の左半分のときだけ受けつける（右半分は消すボタンなどを触るため）。
+   なぞっている間は画面が指について動き、ある程度まで行ったらそのまま閉じる。
+   足りなければ元の位置へ戻る。縦に振ったときは、いつもどおり中身が上下する。 */
+(function () {
+  const el = $("#sheetD");
+  const SLOP = 12;     // これだけ動いてから、縦なぞりか横なぞりかを決める
+  const CLOSE = 70;    // これだけ右へ行ったら閉じる
+  let touch = null, x0 = 0, y0 = 0, dx = 0, way = "";
+
+  el.addEventListener("touchstart", e => {
+    if (touch !== null || e.touches.length !== 1) return;
+    const t = e.touches[0], r = el.getBoundingClientRect();
+    if (t.clientX > r.left + r.width / 2) return;      // 左半分から始めたときだけ
+    touch = t.identifier; x0 = t.clientX; y0 = t.clientY; dx = 0; way = "";
+  }, { passive: true });
+
+  el.addEventListener("touchmove", e => {
+    if (touch === null) return;
+    const t = Array.prototype.find.call(e.touches, x => x.identifier === touch);
+    if (!t) return;
+    const ax = t.clientX - x0, ay = t.clientY - y0;
+    if (!way) {
+      if (Math.abs(ax) < SLOP && Math.abs(ay) < SLOP) return;
+      way = Math.abs(ax) > Math.abs(ay) ? "yoko" : "tate";
+      if (way === "yoko") el.style.transition = "none";
+    }
+    if (way !== "yoko") return;
+    dx = Math.max(0, ax);                              // 右へだけ動かす
+    el.style.transform = "translateX(" + dx + "px)";
+    if (e.cancelable) e.preventDefault();              // 横に動かしている間は上下させない
+  }, { passive: false });
+
+  const release = commit => {
+    if (touch === null) return;
+    const shut = commit && way === "yoko" && dx > CLOSE;
+    touch = null; way = ""; dx = 0;
+    el.style.transition = ""; el.style.transform = "";  // ここから先は CSS のすべりに任せる
+    if (shut) closeSheets();
+  };
+  el.addEventListener("touchend", () => release(true));
+  // 端末に横取りされた（電話が来たなど）ときは、閉じずに元へ戻す
+  el.addEventListener("touchcancel", () => release(false));
+})();
+
 /* ---------- global clicks ---------- */
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;

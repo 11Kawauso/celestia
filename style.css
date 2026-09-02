@@ -380,6 +380,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   padding-top:calc(env(safe-area-inset-top) + 14px);
   transform:translateX(100%);
   box-shadow:-12px 0 40px rgba(10,8,20,.28);
+  touch-action:pan-y;                 /* 上下は端末まかせ、横なぞりは app.js が受けもつ */
 }
 .sheet.side.on{transform:translateX(0)}
 .sidehead{display:flex;align-items:center;gap:11px}
