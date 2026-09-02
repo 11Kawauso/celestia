@@ -225,18 +225,17 @@
       <div class="lab" style="margin-bottom:6px">予定</div>
       <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
+    <input class="field" id="dEvName" placeholder="予定を書く">
+    <!-- 始まりと終わり。どちらも空のままでもかまわない -->
     <div class="timerow">
-      <input class="field" id="dEvName" placeholder="予定を書く" style="flex:2">
-      <input class="field" type="time" id="dEvTime" style="flex:1">
+      <input class="field" type="time" id="dEvTime" aria-label="始まる時刻">
+      <span class="to">〜</span>
+      <input class="field" type="time" id="dEvEnd" aria-label="終わる時刻">
     </div>
     <button class="btn pri" id="dEvAdd">予定を足す</button>
     <div id="dGoalsWrap" hidden>
       <div class="lab" style="margin-bottom:6px">この日が期限の目標</div>
       <div id="dGoals" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-    <div>
-      <div class="lab" style="margin-bottom:6px">この日のミッション</div>
-      <div id="dMissions" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <button class="btn" id="dClose">とじる</button>
   </div>

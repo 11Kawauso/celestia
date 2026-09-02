@@ -383,6 +383,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .day.on{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}
 .timerow{display:flex;gap:8px;align-items:center}
 .timerow input[type=time]{flex:1}
+.timerow .to{flex:none;color:var(--ink3);font-size:13px}   /* 始まり〜終わりの「〜」 */
 
 /* ---- level up ---- */
 .levelup{

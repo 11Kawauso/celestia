@@ -108,7 +108,7 @@ function normalize(o) {
   Object.keys(ev).forEach(k => {
     const list = asArr(ev[k]).map(y => {
       const e = asObj(y);
-      return { id: asStr(e.id) || uid(), title: asStr(e.title), time: asTime(e.time) };
+      return { id: asStr(e.id) || uid(), title: asStr(e.title), time: asTime(e.time), end: asTime(e.end) };
     });
     if (list.length) o.events[k] = list;
   });
@@ -173,6 +173,11 @@ function levelUp() {
 
 /* ---------- mission helpers ---------- */
 const doneOn = (id, k) => (st.log[k] || []).includes(id);
+/* 予定の時刻の見せかた。「9:00〜10:00」／片方だけなら「9:00〜」「〜10:00」／
+   どちらも空なら何も出さない。 */
+const evSpan = e => (e.time || e.end) ? (e.time + "〜" + e.end) : "";
+/* 並べる順は始まる時刻。決めていない予定はうしろへ。 */
+const evKey = e => e.time || e.end || "99";
 function toggleDone(id, k, on) {
   const arr = st.log[k] || (st.log[k] = []);
   const i = arr.indexOf(id);
@@ -490,11 +495,11 @@ function render() {
   ol.style.display = "flex"; ol.style.flexDirection = "column"; ol.style.gap = "9px";
 
   // today's events
-  const ev = (st.events[tk] || []).slice().sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  const ev = (st.events[tk] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#todayEventsSec").hidden = ev.length === 0;
   $("#todayEvents").innerHTML = ev.map(e =>
     '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + '</div>' +
-    (e.time ? '<div class="chips"><span class="chip time">' + esc(e.time) + "</span></div>" : "") +
+    (evSpan(e) ? '<div class="chips"><span class="chip time">' + esc(evSpan(e)) + "</span></div>" : "") +
     "</div></div>").join("");
   $("#todayEvents").style.display = "flex"; $("#todayEvents").style.flexDirection = "column"; $("#todayEvents").style.gap = "9px";
 
@@ -714,16 +719,15 @@ function openDay(k) {
   const [y, m, d] = k.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   $("#dTitle").textContent = m + "月" + d + "日（" + DOW[dt.getDay()] + "）";
-  paintDay(); $("#dEvName").value = ""; $("#dEvTime").value = "";
+  paintDay(); $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
   openSheet("#sheetD");
 }
 function paintDay() {
-  const k = dayKey, [y, mo, d] = k.split("-").map(Number);
-  const dt = new Date(y, mo - 1, d);
-  const ev = (st.events[k] || []).slice().sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  const k = dayKey;
+  const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
     '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
-    (e.time ? '<div class="chips"><span class="chip time">' + esc(e.time) + "</span></div>" : "") + "</div>" +
+    (evSpan(e) ? '<div class="chips"><span class="chip time">' + esc(evSpan(e)) + "</span></div>" : "") + "</div>" +
     '<button class="del" data-act="evdel" data-id="' + esc(e.id) + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></div>'
   ).join("") : '<div class="empty">予定なし</div>';
 
@@ -734,20 +738,12 @@ function paintDay() {
     '<div class="rowtitle">' + esc(g.title) + "</div>" +
     '<div class="chips"><span class="chip ' + (g.done ? "ok" : "time") + '">' +
     (g.done ? "達成ずみ" : "この日が期限") + "</span></div></div></div>").join("");
-
-  const sched = st.missions.filter(m => m.days.includes(dt.getDay()));
-  $("#dMissions").innerHTML = sched.length ? sched.map(m => {
-    const done = doneOn(m.id, k);
-    return '<div class="row' + (done ? " done" : "") + '">' +
-      '<div class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
-      '<div class="rowbody"><div class="rowtitle">' + esc(m.title) + "</div></div>" +
-      '<span class="expbadge">' + (done ? "達成" : "—") + "</span></div>";
-  }).join("") : '<div class="empty">この曜日のミッションはありません</div>';
 }
 $("#dEvAdd").addEventListener("click", () => {
   const t = $("#dEvName").value.trim(); if (!t) return;
-  (st.events[dayKey] || (st.events[dayKey] = [])).push({ id: uid(), title: t, time: $("#dEvTime").value });
-  $("#dEvName").value = ""; $("#dEvTime").value = "";
+  (st.events[dayKey] || (st.events[dayKey] = []))
+    .push({ id: uid(), title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value });
+  $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
   save(); paintDay(); renderCal(); render();
 });
 $("#dClose").addEventListener("click", closeSheets);
