@@ -261,21 +261,50 @@
       <button class="xbtn" id="dClose" aria-label="とじる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="sheettitle" id="dTitle">日付</div>
     </div>
-    <div>
-      <div class="lab" style="margin-bottom:6px">予定</div>
-      <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
+    <!-- 上：追加ずみのもの。ここだけスクロールする -->
+    <div class="dayscroll">
+      <div>
+        <div class="lab" style="margin-bottom:6px">予定</div>
+        <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div id="dGoalsWrap" hidden>
+        <div class="lab" style="margin-bottom:6px">この日が期限の目標</div>
+        <div id="dGoals" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
     </div>
-    <input class="field" id="dEvName" placeholder="予定を書く">
-    <!-- 始まりと終わり。どちらも空のままでもかまわない -->
-    <div class="timerow">
-      <input class="field" type="time" id="dEvTime" aria-label="始まる時刻">
-      <span class="to">〜</span>
-      <input class="field" type="time" id="dEvEnd" aria-label="終わる時刻">
+
+    <!-- 下：入力欄。画面の下に貼り付いて動かない -->
+    <div class="dayform">
+      <input class="field" id="dEvName" placeholder="予定を書く">
+      <!-- 始まりと終わり。どちらも空のままでもかまわない -->
+      <div class="timerow">
+        <input class="field" type="time" id="dEvTime" aria-label="始まる時刻">
+        <span class="to">〜</span>
+        <input class="field" type="time" id="dEvEnd" aria-label="終わる時刻">
+      </div>
+      <div>
+        <div class="lab" style="margin-bottom:6px">通知時間<button class="helpbtn" data-act="help" data-help="n-notify" aria-controls="n-notify" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="timerow">
+          <input class="field" type="date" id="dNotifyDate" aria-label="通知する日">
+          <input class="field" type="time" id="dNotifyTime" aria-label="通知する時刻">
+        </div>
+        <div class="note" id="dNotifyOff" hidden>設定画面で通知をオンにすると使えます。</div>
+        <div class="helptext" id="n-notify"><div class="note">空のままでもかまいません。そのときは、予定の始まりが決まっていればその<b>1時間前</b>、決まっていなければ<b>前の日の昼12時</b>に届きます。ここに入れると、その時刻に変わります。</div></div>
+      </div>
+      <button class="btn pri" id="dEvAdd">予定を追加</button>
     </div>
-    <button class="btn pri" id="dEvAdd">予定を足す</button>
-    <div id="dGoalsWrap" hidden>
-      <div class="lab" style="margin-bottom:6px">この日が期限の目標</div>
-      <div id="dGoals" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- 確認の小窓。いまは予定を消すときに使う -->
+<div class="sheet" id="sheetC">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="cTitle">消しますか</div>
+    <div class="note" id="cName"></div>
+    <div class="btnrow">
+      <button class="btn" id="cNo">やめる</button>
+      <button class="btn danger" id="cYes">消す</button>
     </div>
   </div>
 </div>

@@ -54,6 +54,7 @@ const asArr = v => (Array.isArray(v) ? v : []);
 const asObj = v => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
 const asDate = v => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
 const asTime = v => (/^\d{2}:\d{2}$/.test(v) ? v : "");
+const asStamp = v => (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? v : "");   // 通知の日時
 
 function normalize(o) {
   o = asObj(o);
@@ -108,7 +109,8 @@ function normalize(o) {
   Object.keys(ev).forEach(k => {
     const list = asArr(ev[k]).map(y => {
       const e = asObj(y);
-      return { id: asStr(e.id) || uid(), title: asStr(e.title), time: asTime(e.time), end: asTime(e.end) };
+      return { id: asStr(e.id) || uid(), title: asStr(e.title),
+               time: asTime(e.time), end: asTime(e.end), notify: asStamp(e.notify) };
     });
     if (list.length) o.events[k] = list;
   });
@@ -173,6 +175,20 @@ function levelUp() {
 
 /* ---------- mission helpers ---------- */
 const doneOn = (id, k) => (st.log[k] || []).includes(id);
+/* 通知が使える状態か。設定画面のトグルはこれから作るので、いまはまだオフのまま。 */
+const canNotify = () => typeof Notification !== "undefined" && Notification.permission === "granted";
+const stampOf = d => keyOf(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+/* 通知をいつ出すか。決めてあればその時刻。
+   決めていなければ、始まりの1時間前／始まりが無ければ前の日の昼12時。 */
+function notifyAt(k, e) {
+  if (e.notify) return e.notify;
+  const [y, m, d] = k.split("-").map(Number);
+  if (e.time) return stampOf(new Date(y, m - 1, d, +e.time.slice(0, 2) - 1, +e.time.slice(3)));
+  return stampOf(new Date(y, m - 1, d - 1, 12, 0));
+}
+/* 通知の日時の見せかた。「9/29 12:00」 */
+const stampText = v => (+v.slice(5, 7)) + "/" + (+v.slice(8, 10)) + " " + v.slice(11);
+
 /* 予定の時刻の見せかた。「9:00〜10:00」／片方だけなら「9:00〜」「〜10:00」／
    どちらも空なら何も出さない。 */
 const evSpan = e => (e.time || e.end) ? (e.time + "〜" + e.end) : "";
@@ -737,6 +753,21 @@ $("#mDelete").addEventListener("click", e => {
   save(); render(); closeSheet("#sheetM");
 });
 
+/* 確認の小窓。消す前に一度だけ止める。中身を差しかえて他でも使える。 */
+let confirmFn = null;
+function askConfirm(title, name, fn) {
+  $("#cTitle").textContent = title;
+  $("#cName").textContent = name;
+  confirmFn = fn;
+  openSheet("#sheetC");
+}
+$("#cNo").addEventListener("click", () => closeSheet("#sheetC"));
+$("#cYes").addEventListener("click", () => {
+  const fn = confirmFn; confirmFn = null;
+  closeSheet("#sheetC");
+  if (fn) fn();
+});
+
 /* day sheet */
 let dayKey = null;
 function openDay(k) {
@@ -744,15 +775,25 @@ function openDay(k) {
   const [y, m, d] = k.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   $("#dTitle").textContent = m + "月" + d + "日（" + DOW[dt.getDay()] + "）";
-  paintDay(); $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
+  paintDay();
+  $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
+  $("#dNotifyDate").value = ""; $("#dNotifyTime").value = "";
   openSheet("#sheetD");
 }
 function paintDay() {
   const k = dayKey;
+  // 通知時間は、設定画面で通知をオンにするまでさわれない
+  const ok = canNotify();
+  $("#dNotifyDate").disabled = $("#dNotifyTime").disabled = !ok;
+  $("#dNotifyOff").hidden = ok;
+
   const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
     '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
-    (evSpan(e) ? '<div class="chips"><span class="chip time">' + esc(evSpan(e)) + "</span></div>" : "") + "</div>" +
+    (evSpan(e) || e.notify ? '<div class="chips">' +
+      (evSpan(e) ? '<span class="chip time">' + esc(evSpan(e)) + "</span>" : "") +
+      (e.notify ? '<span class="chip">通知 ' + esc(stampText(e.notify)) + "</span>" : "") +
+      "</div>" : "") + "</div>" +
     '<button class="del" data-act="evdel" data-id="' + esc(e.id) + '" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></div>'
   ).join("") : '<div class="empty">予定なし</div>';
 
@@ -766,17 +807,26 @@ function paintDay() {
 }
 $("#dEvAdd").addEventListener("click", () => {
   const t = $("#dEvName").value.trim(); if (!t) return;
+  // 通知時間は、日か時刻のどちらかだけでも通す。
+  // 日が空なら予定の日、時刻が空なら昼12時。どちらも空なら「決めていない」。
+  const nd = $("#dNotifyDate").value, nt = $("#dNotifyTime").value;
+  const notify = canNotify() && (nd || nt) ? (nd || dayKey) + "T" + (nt || "12:00") : "";
   (st.events[dayKey] || (st.events[dayKey] = []))
-    .push({ id: uid(), title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value });
+    .push({ id: uid(), title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value, notify: notify });
   $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
+  $("#dNotifyDate").value = ""; $("#dNotifyTime").value = "";
   save(); paintDay(); renderCal(); render();
 });
 $("#dClose").addEventListener("click", () => closeSheet("#sheetD"));
 $("#dEvents").addEventListener("click", e => {
   const b = e.target.closest('[data-act="evdel"]'); if (!b) return;
-  st.events[dayKey] = (st.events[dayKey] || []).filter(x => x.id !== b.dataset.id);
-  if (!st.events[dayKey].length) delete st.events[dayKey];
-  save(); paintDay(); renderCal(); render();
+  const id = b.dataset.id, ev = (st.events[dayKey] || []).find(x => x.id === id);
+  if (!ev) return;
+  askConfirm("この予定を消しますか", ev.title, () => {
+    st.events[dayKey] = (st.events[dayKey] || []).filter(x => x.id !== id);
+    if (!st.events[dayKey].length) delete st.events[dayKey];
+    save(); paintDay(); renderCal(); render();
+  });
 });
 
 /* 指で右へなぞって閉じる。

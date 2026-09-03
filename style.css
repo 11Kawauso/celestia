@@ -386,6 +386,13 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .xbtn:active{background:var(--line)}
 .xbtn svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
 .sheetin{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:13px}
+/* 日付の画面は上下に分ける。上（追加ずみ）だけが動き、下（入力欄）は動かない。 */
+#sheetD{overflow:hidden}
+#sheetD .sheetin{height:100%}
+.dayscroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:13px}
+.dayform{flex:none;display:flex;flex-direction:column;gap:13px;
+  padding-top:13px;border-top:1px solid var(--line)}
+.field:disabled{opacity:.45}   /* 通知がオフのあいだの通知時間 */
 .grab{width:36px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 2px}
 .sheettitle{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:17px}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
