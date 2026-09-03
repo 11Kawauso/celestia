@@ -23,7 +23,7 @@ function seed() {
       wakeMission(uid(), WAKE_DEFAULT)
     ],
     goals: [],
-    events: {}, log: {}, theme: "auto"
+    events: {}, log: {}, theme: "auto", notify: false
   };
 }
 /* 保存データを今の形にそろえる。古い版から来たものも、手で書きかえられたものも
@@ -121,6 +121,7 @@ function normalize(o) {
     if (list.length) o.log[k] = list;
   });
 
+  o.notify = !!o.notify;      // 通知を使うか（端末の許可とは別に、こちらでも持つ）
   o.v = 2;
   delete o.todos; delete o.help;
   return o;
@@ -175,8 +176,9 @@ function levelUp() {
 
 /* ---------- mission helpers ---------- */
 const doneOn = (id, k) => (st.log[k] || []).includes(id);
-/* 通知が使える状態か。設定画面のトグルはこれから作るので、いまはまだオフのまま。 */
-const canNotify = () => typeof Notification !== "undefined" && Notification.permission === "granted";
+/* 通知が使える状態か。端末の許可と、設定画面のトグルの両方が要る。 */
+const notifyOK = () => typeof Notification !== "undefined" && "serviceWorker" in navigator;
+const canNotify = () => notifyOK() && Notification.permission === "granted" && !!st.notify;
 const stampOf = d => keyOf(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
 /* 通知をいつ出すか。決めてあればその時刻。
    決めていなければ、始まりの1時間前／始まりが無ければ前の日の昼12時。 */
@@ -1007,7 +1009,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   closePop();
   window.scrollTo(0, 0);
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
+  if (t.dataset.v === "set") { $("#backup").value = JSON.stringify(st); paintNotify(); }
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
@@ -1131,6 +1133,65 @@ function applyTheme() {
   const m = document.querySelector('meta[name="theme-color"]');
   if (m) m.setAttribute("content", dark ? "#0d1020" : "#f3f5fc");
 }
+/* ---------- 通知 ---------- */
+/* いまできるのは「許可をもらう」「テストで1通出す」まで。
+   予定にあわせて自動で届く仕組み（サーバー）は、このあと足す。
+   iPhoneはホーム画面に追加したときだけ通知を出せる決まりなので、
+   ブラウザのタブで開いているあいだはトグルを触れなくしておく。 */
+const standalone = () =>
+  (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+  window.navigator.standalone === true;
+const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPad は Mac を名乗る
+
+function paintNotify() {
+  const tog = $("#notifyTog"), lab = $("#notifyLab"), msg = $("#notifyMsg"), test = $("#notifyTest");
+  const perm = notifyOK() ? Notification.permission : "unsupported";
+  const on = canNotify();
+  let stop = "";                                   // 触れない理由。空なら使える
+  if (!notifyOK()) stop = "このブラウザでは通知を使えません。";
+  else if (isIOS() && !standalone()) stop = "ホーム画面に追加したセレスティアから開くと使えます。";
+  else if (perm === "denied") stop = "端末側で通知が切られています。iPhoneの「設定」アプリの通知から許可してください。";
+
+  tog.disabled = !!stop;
+  tog.setAttribute("aria-checked", on ? "true" : "false");
+  lab.textContent = on ? "オン" : "オフ";
+  msg.textContent = stop || (on
+    ? "いまはテスト通知だけ出せます。予定にあわせた通知はこれから作ります。"
+    : "オンにすると、端末が一度だけ許可をたずねます。");
+  test.hidden = !on;
+}
+$("#notifyTog").addEventListener("click", async () => {
+  if ($("#notifyTog").disabled) return;
+  if (canNotify()) { st.notify = false; save(); paintNotify(); return; }   // オフにする
+  let perm = Notification.permission;
+  if (perm === "default") {
+    try { perm = await Notification.requestPermission(); } catch (e) { perm = Notification.permission; }
+  }
+  st.notify = perm === "granted";
+  save(); paintNotify();
+  if (perm !== "granted") setMsg("通知は許可されませんでした。", true);
+});
+/* 通知係（Service Worker）の支度ができるまで待つ。
+   file: で開いたときなど、いつまでも支度ができない場合があるので、
+   4秒で見切りをつけて「出せなかった」と伝える。 */
+const swReady = () => Promise.race([
+  navigator.serviceWorker.ready,
+  new Promise((ok, no) => setTimeout(() => no(new Error("まだ支度ができていません")), 4000))
+]);
+$("#notifyTest").addEventListener("click", async () => {
+  try {
+    const reg = await swReady();
+    await reg.showNotification("セレスティア", {
+      body: "……ちゃんと届いているな。",
+      tag: "celestia-test",
+      data: { url: "./" }
+    });
+  } catch (e) {
+    setMsg("通知を出せませんでした。ホーム画面から開いているか確かめてください。", true);
+  }
+});
+
 $("#themePills").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
   st.theme = b.dataset.t; save(); applyTheme();
@@ -1144,6 +1205,7 @@ if (window.matchMedia) {
 
 /* ---------- boot ---------- */
 applyTheme();
+paintNotify();
 updateSpeech(new Date());
 render();
 let lastDay = keyOf(new Date());

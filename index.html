@@ -105,6 +105,17 @@
       </div>
 
       <div class="card">
+        <div class="lab">通知<button class="helpbtn" data-act="help" data-help="n-notice" aria-controls="n-notice" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="toggrow">
+          <div class="toglab" id="notifyLab">オフ</div>
+          <button class="toggle" id="notifyTog" role="switch" aria-checked="false" aria-label="通知"><span class="knob"></span></button>
+        </div>
+        <div class="note" id="notifyMsg"></div>
+        <button class="btn" id="notifyTest" hidden>テスト通知を出す</button>
+        <div class="helptext" id="n-notice"><div class="note">iPhoneでは、<b>ホーム画面に追加したセレスティア</b>からのみ通知を出せます。オンにすると端末が一度だけ許可をたずねます。ここで「許可しない」を選ぶと、あとからはiPhoneの「設定」アプリからしか戻せません。<br>いまはテスト通知だけです。予定にあわせて自動で届く仕組みは、これから作ります。</div></div>
+      </div>
+
+      <div class="card">
         <div class="lab">バックアップ<button class="helpbtn" data-act="help" data-help="n-backup" aria-controls="n-backup" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <div class="helptext" id="n-backup"><div class="note">キャラのレベルも記録もこの端末の中にだけあります。ときどき下の文字をコピーして、メモアプリなどに貼って残しておくと安心です。</div></div>
         <textarea class="field" id="backup" readonly></textarea>
