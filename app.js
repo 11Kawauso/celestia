@@ -1,5 +1,7 @@
 "use strict";
 const LS = "questlog.v1";
+const STATE_CACHE = "celestia-state";   // 通知係と共有する置き場（sw.js も同じ名前を使う）
+const STATE_KEY = "state.json";
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const pad = n => String(n).padStart(2, "0");
@@ -135,8 +137,24 @@ try {
 if (!st || !st.chara) st = seed();
 st = normalize(st);
 
+/* 通知係（sw.js）はアプリが閉じていても動くので、localStorage を読めない。
+   そこで「予定・レベル・呼び名」だけを、両方から読める置き場に写しておく。
+   写すのは今日から先の予定だけ。ここにある名前は端末の外へは出さない。 */
+async function mirror() {
+  if (!("caches" in window)) return;
+  try {
+    const today = keyOf(new Date()), days = {};
+    Object.keys(st.events).forEach(k => { if (k >= today) days[k] = st.events[k]; });
+    const box = await caches.open(STATE_CACHE);
+    await box.put(STATE_KEY, new Response(JSON.stringify({
+      level: st.chara.level, user: st.user, events: days
+    }), { headers: { "content-type": "application/json" } }));
+  } catch (e) { /* 写せなくても本体は動く */ }
+}
+
 let saveWarned = false;
 function save() {
+  mirror();
   try { localStorage.setItem(LS, JSON.stringify(st)); }
   catch (e) {
     if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。端末の空き容量を確認してください。", true); }
@@ -309,15 +327,10 @@ const holidayName = d => holidaysOf(d.getFullYear())[(d.getMonth() + 1) + "-" + 
      2: Lv18-34 力天使／権天使        名前で呼ぶ・素直
      3: Lv35-   大天使／熾天使        「ご主人様」・丁寧
    文面を変えたいときは下の SPEECH だけ直せばよい。{you} は呼び方、{n} は残りの数。 */
-function toneOf(lv) { return lv >= 35 ? 3 : lv >= 18 ? 2 : lv >= 6 ? 1 : 0; }
-function callName(lv) {
-  const you = (st.user || "").trim();
-  const t = toneOf(lv);
-  if (t === 3) return "ご主人様";
-  if (t === 2) return you || "あんた";   // 名前が未設定なら前の段階の呼び方
-  if (t === 1) return "あんた";
-  return "お前";
-}
+/* 段階と呼び方の決まりは notify-lines.js に置いてある。
+   通知（アプリが閉じていても出る）と同じものを使いたいので、そちらを本家にした。 */
+function toneOf(lv) { return NOTIFY.tone(lv); }
+function callName(lv) { return NOTIFY.you(lv, st.user); }
 /* しゃべる場面。押した瞬間に出るものと、アプリを開いたときに出るものがある。
    開いたときに出るものは「その日はじめて条件を満たしたとき」に一度だけ。
    重なった日は、この並びの上にあるものだけが出る（並べ替えれば優先順が変わる）。 */
@@ -1182,11 +1195,11 @@ const swReady = () => Promise.race([
 $("#notifyTest").addEventListener("click", async () => {
   try {
     const reg = await swReady();
-    await reg.showNotification("セレスティア", {
-      body: "……ちゃんと届いているな。",
-      tag: "celestia-test",
-      data: { url: "./" }
-    });
+    // 本番と同じ組み立てを通す。いまのレベルの口調で出る。
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    const t = NOTIFY.make({ title: "テスト通知", time: "15:00", day: keyOf(d) },
+                          keyOf(new Date()), st.chara.level, st.user);
+    await reg.showNotification(t.title, { body: t.body, tag: "celestia-test", data: { url: "./" } });
   } catch (e) {
     setMsg("通知を出せませんでした。ホーム画面から開いているか確かめてください。", true);
   }
@@ -1205,6 +1218,7 @@ if (window.matchMedia) {
 
 /* ---------- boot ---------- */
 applyTheme();
+mirror();
 paintNotify();
 updateSpeech(new Date());
 render();

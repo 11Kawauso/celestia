@@ -3,12 +3,17 @@
    だからサイトを更新すれば次に開いたとき必ず新しくなる。
    電波がないときだけキャッシュを出すので、オフラインでも開ける。 */
 
+importScripts("./notify-lines.js");   // 通知の文面。アプリ本体と同じものを使う
+
 const CACHE = "celestia-v2";
+const STATE_CACHE = "celestia-state";   // アプリが写した予定とレベルの置き場（app.js と同じ名前）
+const STATE_KEY = "state.json";
 const CORE = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./notify-lines.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -28,7 +33,9 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE && k !== STATE_CACHE).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
@@ -42,18 +49,36 @@ function store(req, res) {
 }
 
 /* ---------- 通知 ---------- */
-/* サーバーから届いたものを、そのまま出す。
-   いまは title と body をそのまま使う形。あとで、この中で端末の中の予定と
-   レベルを見て文面を組み立てる（そうすれば予定の名前を外に出さずに済む）。 */
+/* サーバーから届くのは「どの日の、どの予定か」だけ。
+   予定の名前もレベルも端末の中（下の控え）から読むので、外には出ていかない。 */
+async function stateNow() {
+  try {
+    const box = await caches.open(STATE_CACHE);
+    const res = await box.match(STATE_KEY);
+    return res ? await res.json() : null;
+  } catch (e) { return null; }
+}
+async function buildNotice(d) {
+  const st = await stateNow();
+  const list = st && st.events && st.events[d.k];
+  const ev = list && list.find(x => x.id === d.id);
+  if (!ev) return { title: "セレスティア", body: "予定の時間だぞ。" };   // 控えが無いときの保険
+  const today = new Date();
+  const key = today.getFullYear() + "-" +
+    String(today.getMonth() + 1).padStart(2, "0") + "-" +
+    String(today.getDate()).padStart(2, "0");
+  return NOTIFY.make({ title: ev.title, time: ev.time, day: d.k }, key, st.level || 1, st.user || "");
+}
 self.addEventListener("push", e => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; }
-  catch (err) { d = { body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "セレスティア", {
-    body: d.body || "",
-    tag: d.tag || "celestia",
-    data: { url: d.url || "./" }
-  }));
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = {}; }
+  e.waitUntil(
+    buildNotice(d).then(t => self.registration.showNotification(t.title, {
+      body: t.body,
+      tag: "celestia-" + (d.id || "x"),
+      data: { url: "./" }
+    }))
+  );
 });
 
 /* 通知を押したら、開いているアプリに戻す。無ければ開く。 */
