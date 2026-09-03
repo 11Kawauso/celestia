@@ -114,44 +114,25 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .view.on{display:flex}
 
 /* ---- キャラ画像とセリフ ---- */
-/* 絵とセリフはその場に留まり、下の中身がシートのように上に重なってくる。
-   --stageTop は絵の元の位置（app.js が実寸から入れる）。
-   ここに貼り付けるので、スクロールしても絵は動かない。 */
-/* main の下余白（下タブぶん）はシートが自前で持つので、ホームでは打ち消す */
-#v-home{gap:0;margin-bottom:calc(-1 * (env(safe-area-inset-bottom) + 88px))}
-/* ホームで動くスクロールは、下のシートひとつだけ。画面そのものは動かさない。
-   ここが動くと、シートと画面の二重のスクロールに戻ってしまう。 */
-body:has(#v-home.on){overflow:hidden}
-.stage{
-  display:flex;flex-direction:column;gap:12px;
-  position:sticky;top:var(--stageTop,61px);z-index:0;
+/* ホームは絵とセリフだけ。レベルとミッションは右上のゲージから呼び出す。 */
+#v-home{position:relative}
+.stage{display:flex;flex-direction:column;gap:12px}
+
+/* 右上の小さいゲージ。輪の形は大きいほうと同じで、まんなかに今のレベルの数字。
+   棘が輪の外に出るので、はみ出しは切らない。 */
+.minihalo{
+  position:absolute;top:10px;right:10px;z-index:2;   /* 棘が外に出るぶん、角から少し離す */
+  width:48px;height:48px;flex:none;display:grid;place-items:center;
+  filter:drop-shadow(0 2px 6px rgba(10,8,20,.45));
 }
-/* シートは画面いっぱいの大きさで貼り付いていて、動くのはその中身だけ。
-   中身の上には --sheetLead ぶんの余白（絵ぶんの下駄）がある。指をすべらせると、
-   まずこの余白が減って中身が絵の上にせり上がり、そのまま続けて中身が流れていく。
-   絵のまんなか（--overlapTop）より上は mask で消してあるので、そこまで来た
-   中身は吸いこまれるように見えなくなる。見た目は前のままで、動きだけが
-   ひとつながりになる（前は画面とシートで別々のスクロールだった）。
-   ふたつの数字は絵の実寸から app.js が入れる。 */
-.overlap{
-  position:absolute;inset:0;z-index:1;           /* 本体（.wrap）にぴったり重ねる。
-                                                    画面ではなく本体を基準にするのは、PCの
-                                                    スクロールバーぶんだけ幅がずれないため */
-  overflow-y:auto;overscroll-behavior:contain;   /* 端まで来ても外へ引っぱらない */
-  scroll-padding-top:var(--overlapTop,272px);    /* キーボードで送った先が、消える所に入らないように */
-  display:flex;flex-direction:column;gap:18px;
-  padding:var(--sheetLead,608px) 16px calc(env(safe-area-inset-bottom) + 96px);
-  background:transparent;                        /* カードの隙間から後ろの絵を見せる */
-  -webkit-mask-image:linear-gradient(#0000 0 var(--overlapTop,272px),#000 var(--overlapTop,272px));
-  mask-image:linear-gradient(#0000 0 var(--overlapTop,272px),#000 var(--overlapTop,272px));
+.minihalo:active{transform:scale(.93)}
+.minihalo .ring{position:absolute;inset:0;width:48px;height:48px}
+.miniface{fill:color-mix(in srgb,var(--bg2) 88%,transparent)}   /* 数字を読めるようにする下じき */
+.minilv{
+  position:relative;font-family:"Shippori Mincho B1",serif;font-weight:800;
+  font-size:17px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;
 }
-/* ここだけスクロールバーを出さない。動かせることは中身を見れば分かるので、
-   絵の上に棒が乗るほうが目ざわりになる。スクロール自体はできる。 */
-.overlap{scrollbar-width:none}
-.overlap::-webkit-scrollbar{display:none}
-/* 高さを決めた縦フレックスなので、これが無いと中身が縮められて
-   カードがぺしゃんこになる。はみ出させてスクロールさせる。 */
-.overlap > *{flex:none}
+
 .portrait{
   width:100%;aspect-ratio:3/4;max-height:52vh;
   border-radius:18px;overflow:hidden;
@@ -368,7 +349,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .scrim{position:fixed;inset:0;z-index:40;background:rgba(10,8,20,.5);opacity:0;pointer-events:none;transition:opacity .22s}
 .scrim.on{opacity:1;pointer-events:auto}
 .sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:41;
+  position:fixed;left:0;right:0;bottom:0;z-index:42;
   background:var(--bg);border-top:1px solid var(--line);
   border-radius:20px 20px 0 0;
   padding:16px 16px calc(env(safe-area-inset-bottom) + 18px);
@@ -379,7 +360,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 /* 日付の詳細だけは、下からではなく右からすべって出す。
    画面いっぱいの別ページのあつかいなので、閉じるのは左上の×。 */
 .sheet.side{
-  top:0;max-height:none;
+  top:0;max-height:none;z-index:41;              /* 下から出るシートは、この上に重ねる */
   border-top:0;border-left:1px solid var(--line);border-radius:0;
   padding-top:calc(env(safe-area-inset-top) + 14px);
   transform:translateX(100%);

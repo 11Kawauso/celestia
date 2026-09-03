@@ -463,8 +463,12 @@ function render() {
   const nd = need(c.level);
   const C = 2 * Math.PI * 47;
   const p = Math.max(0, Math.min(1, c.exp / nd));
-  $("#ringfill").setAttribute("stroke-dasharray", C.toFixed(1));
-  $("#ringfill").setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
+  // 輪は大（パネルの中）と小（ホーム右上）のふたつ。どちらも同じ値で動かす
+  $$(".rfill").forEach(r => {
+    r.setAttribute("stroke-dasharray", C.toFixed(1));
+    r.setAttribute("stroke-dashoffset", (C * (1 - p)).toFixed(1));
+  });
+  $("#minilv").textContent = c.level;
   // 棘は、輪の光が自分の位置を通りすぎたぶんだけ金色になる（レベルが上がればまた消える）
   $$(".spikes path").forEach(sp => sp.classList.toggle("on", p >= +sp.dataset.at));
   $("#expnow").textContent = c.exp + " / " + nd + " EXP";
@@ -622,12 +626,20 @@ function renderCal() {
 
 /* ---------- sheets ---------- */
 function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); }
-function closeSheets() {
+/* 1枚だけ閉じる。ミッションを保存したときに、その下のステータス画面まで
+   一緒に閉じてしまわないように、閉じるのは自分の分だけにする。 */
+function closeSheet(id) {
+  $(id).classList.remove("on");
+  $("#scrim").classList.toggle("on", $$(".sheet.on").length > 0);
+}
+function closeSheets() {                       // 全部たたむ（タブを移ったときなど）
   $("#scrim").classList.remove("on");
-  $("#sheetM").classList.remove("on"); $("#sheetD").classList.remove("on");
-  $("#sheetG").classList.remove("on");
+  $$(".sheet").forEach(x => x.classList.remove("on"));
 }
 $("#scrim").addEventListener("click", closeSheets);
+/* 右上の小さいゲージ＝レベルとミッションの入口 */
+$("#openStatus").addEventListener("click", () => openSheet("#sheetS"));
+$("#sClose").addEventListener("click", () => closeSheet("#sheetS"));
 
 /* mission editor */
 let editing = null, draft = null;
@@ -686,7 +698,7 @@ $("#mMode").addEventListener("click", e => {
 });
 $("#mTime").addEventListener("change", e => { draft.time = e.target.value; });
 $("#mName").addEventListener("input", e => { draft.title = e.target.value; });
-$("#mCancel").addEventListener("click", closeSheets);
+$("#mCancel").addEventListener("click", () => closeSheet("#sheetM"));
 $("#mSave").addEventListener("click", () => {
   let data;
   if (draft.type === "wake") {
@@ -701,17 +713,17 @@ $("#mSave").addEventListener("click", () => {
   }
   if (editing) Object.assign(st.missions.find(x => x.id === editing), data);
   else st.missions.push(Object.assign({ id: uid() }, data));
-  save(); render(); closeSheets();
+  save(); render(); closeSheet("#sheetM");
 });
 let delArm = false;
 $("#mDelete").addEventListener("click", e => {
   if (!delArm) { delArm = true; e.target.textContent = "もう一度おすと消えます"; setTimeout(() => { delArm = false; e.target.textContent = "このミッションを消す"; }, 3000); return; }
   const target = st.missions.find(m => m.id === editing);
-  if (target && target.type === "wake") { closeSheets(); return; }   // 早起きは消せない
+  if (target && target.type === "wake") { closeSheet("#sheetM"); return; }   // 早起きは消せない
   st.missions = st.missions.filter(m => m.id !== editing);
   Object.keys(st.log).forEach(k => { st.log[k] = st.log[k].filter(id => id !== editing); if (!st.log[k].length) delete st.log[k]; });
   delArm = false; e.target.textContent = "このミッションを消す";
-  save(); render(); closeSheets();
+  save(); render(); closeSheet("#sheetM");
 });
 
 /* day sheet */
@@ -748,7 +760,7 @@ $("#dEvAdd").addEventListener("click", () => {
   $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
   save(); paintDay(); renderCal(); render();
 });
-$("#dClose").addEventListener("click", closeSheets);
+$("#dClose").addEventListener("click", () => closeSheet("#sheetD"));
 $("#dEvents").addEventListener("click", e => {
   const b = e.target.closest('[data-act="evdel"]'); if (!b) return;
   st.events[dayKey] = (st.events[dayKey] || []).filter(x => x.id !== b.dataset.id);
@@ -760,8 +772,7 @@ $("#dEvents").addEventListener("click", e => {
    始まりが画面の左半分のときだけ受けつける（右半分は消すボタンなどを触るため）。
    なぞっている間は画面が指について動き、ある程度まで行ったらそのまま閉じる。
    足りなければ元の位置へ戻る。縦に振ったときは、いつもどおり中身が上下する。 */
-(function () {
-  const el = $("#sheetD");
+$$(".sheet.side").forEach(el => {
   const SLOP = 12;     // これだけ動いてから、縦なぞりか横なぞりかを決める
   const CLOSE = 70;    // これだけ右へ行ったら閉じる
   let touch = null, x0 = 0, y0 = 0, dx = 0, way = "";
@@ -794,12 +805,12 @@ $("#dEvents").addEventListener("click", e => {
     const shut = commit && way === "yoko" && dx > CLOSE;
     touch = null; way = ""; dx = 0;
     el.style.transition = ""; el.style.transform = "";  // ここから先は CSS のすべりに任せる
-    if (shut) closeSheets();
+    if (shut) closeSheet("#" + el.id);
   };
   el.addEventListener("touchend", () => release(true));
   // 端末に横取りされた（電話が来たなど）ときは、閉じずに元へ戻す
   el.addEventListener("touchcancel", () => release(false));
-})();
+});
 
 /* ---------- global clicks ---------- */
 document.addEventListener("click", e => {
@@ -906,8 +917,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   closePop();
   window.scrollTo(0, 0);
-  const ov = $(".overlap"); if (ov) ov.scrollTop = 0;   // シートの中も先頭へ
-  if (t.dataset.v === "home") syncStageTop();           // 隠れている間は測れないので測り直す
+  closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") $("#backup").value = JSON.stringify(st);
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
@@ -963,7 +973,7 @@ $("#gAddStep").addEventListener("click", () => {
   paintGSteps();
   const ins = $$("#gSteps input"); if (ins.length) ins[ins.length - 1].focus();
 });
-$("#gCancel").addEventListener("click", closeSheets);
+$("#gCancel").addEventListener("click", () => closeSheet("#sheetG"));
 $("#gSave").addEventListener("click", () => {
   const t = $("#gName").value.trim();
   if (!t) { $("#gName").focus(); return; }
@@ -976,7 +986,7 @@ $("#gSave").addEventListener("click", () => {
   } else {
     st.goals.unshift({ id: uid(), title: t, due: gdraft.due, steps: steps, done: false, doneAt: "" });
   }
-  save(); render(); closeSheets();
+  save(); render(); closeSheet("#sheetG");
 });
 let gDelArm = false;
 $("#gDelete").addEventListener("click", e => {
@@ -987,7 +997,7 @@ $("#gDelete").addEventListener("click", e => {
   }
   st.goals = st.goals.filter(g => g.id !== gediting);
   gDelArm = false; e.target.textContent = "この目標を消す";
-  save(); render(); closeSheets();
+  save(); render(); closeSheet("#sheetG");
 });
 
 /* ---------- settings ---------- */
@@ -1044,47 +1054,6 @@ if (window.matchMedia) {
 }
 
 /* ---------- boot ---------- */
-/* 絵の位置と、シートの中身の「下駄」の高さを実寸から測って CSS に渡す。
-   --stageTop  ヘッダーの高さ＋main の上余白＝絵の元の位置。ここに貼り付けるので、
-               スクロールしても絵は一切動かない（ずれていると動きはじめに少しずれる）。
-   --overlapTop 全体絵のまんなか。ここより上には、シートの中身を出さない。
-               絵の上半分（顔まわり）はいつも見えたままになる。
-   --sheetLead シートの中身が絵の下から始まるための、上の余白。
-               36 は「絵とシートのすきま 18 ＋ シートの内がわ 18」。 */
-let sheetLead = 0, overlapTop = 272;
-function syncStageTop() {
-  const art = $("#portrait").offsetHeight;
-  if (!art) return;                 // ホーム以外を見ているときは測れないので、そのまま残す
-  const head = $(".top").offsetHeight;
-  const pad = parseFloat(getComputedStyle($("main")).paddingTop) || 0;
-  const stageTop = head + pad;
-  const root = document.documentElement.style;
-  root.setProperty("--stageTop", stageTop + "px");
-  overlapTop = Math.round(stageTop + art / 2);
-  root.setProperty("--overlapTop", overlapTop + "px");
-
-  const lead = Math.round(stageTop + $(".stage").offsetHeight + 36);
-  // セリフの行数が変わると下駄の高さも変わる。読んでいる途中に中身が飛ばないよう、
-  // 変わったぶんだけスクロール位置を押し戻しておく。
-  const ov = $(".overlap");
-  if (ov && sheetLead && ov.scrollTop) ov.scrollTop += lead - sheetLead;
-  sheetLead = lead;
-  root.setProperty("--sheetLead", lead + "px");
-}
-window.addEventListener("resize", syncStageTop);
-// セリフの行数や、あとから届いたフォントで絵まわりの高さが変わっても付いていく
-if (window.ResizeObserver) new ResizeObserver(syncStageTop).observe($(".stage"));
-syncStageTop();
-
-/* 絵のまんなかより上へ流れていったカードは、mask で見えなくなっているだけで、
-   その場所にはまだ居る。見えていないボタンを押せてしまうと事故になるので、
-   その高さでの押し込みは、ここで飲みこむ。指でなぞる（スクロール）はそのまま効く。 */
-$(".overlap").addEventListener("click", e => {
-  if (!e.detail) return;                                                   // キーボードからの決定は素通し
-  const line = e.currentTarget.getBoundingClientRect().top + overlapTop;   // 消えはじめる高さ
-  if (e.clientY < line) { e.stopPropagation(); e.preventDefault(); }
-}, true);
-
 applyTheme();
 updateSpeech(new Date());
 render();
