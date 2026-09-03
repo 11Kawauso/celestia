@@ -109,17 +109,17 @@ button{background:none;border:none;cursor:pointer}
 }
 .pop:not(.below) .poparrow{bottom:-6px;border-top:0;border-left:0}
 .pop.below .poparrow{top:-6px;border-bottom:0;border-right:0}
-main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px);
-  display:flex;flex-direction:column}                /* 中の画面を縦いっぱいに伸ばすため */
+main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .view{display:none;flex-direction:column;gap:18px}
-.view.on{display:flex;flex:1}
+.view.on{display:flex}
 
 /* ---- キャラ画像とセリフ ---- */
 /* ホームは絵とセリフだけ。レベルとミッションは右上のゲージから呼び出す。
-   絵は上、セリフは下タブのすぐ上に置く。あいだが空くのは、そこを埋める絵が
-   入るまでの姿（絵を大きくしたいときは .portrait の max-height を上げる）。 */
+   セリフは下タブのすぐ上に貼り付けるので、ここに残るのは絵だけ。
+   あいだが空くのは、そこを埋める絵が入るまでの姿
+   （絵を大きくしたいときは .portrait の max-height を上げる）。 */
 #v-home{position:relative}
-.stage{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:space-between}
+.stage{display:flex;flex-direction:column;gap:12px}
 
 /* 右上の小さいゲージ。輪の形は大きいほうと同じで、まんなかに今のレベルの数字。
    棘が輪の外に出るので、はみ出しは切らない。 */
@@ -145,8 +145,15 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px);
 .portrait img{width:100%;height:100%;object-fit:cover;display:block}
 /* 絵が入るまでの仮置き */
 .portrait .rune{font-family:"Shippori Mincho B1",serif;font-size:60px;color:var(--ink3);opacity:.45}
-/* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。 */
+/* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。
+   下タブのすぐ上に貼り付けてあり、後ろがどう動いてもここから動かない。
+   下端の位置は main の下余白と同じ式なので、下タブとの間隔が揃う。
+   重なりの順番は、下タブ（30）より下・絵（0〜2）より上。
+   右から出るパネル（41〜）が開けば、その下に隠れる。 */
 .speech{
+  position:fixed;z-index:25;left:0;right:0;margin:0 auto;
+  bottom:calc(env(safe-area-inset-bottom) + 88px);
+  width:calc(100% - 32px);max-width:448px;          /* 本体の幅から左右の余白ぶんを引く */
   background:var(--bg2);border:1px solid var(--line);
   padding:13px 15px;box-shadow:var(--shadow);
   font-size:14px;line-height:1.75;overflow-wrap:anywhere;
