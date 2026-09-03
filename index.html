@@ -291,7 +291,11 @@
         <div class="note" id="dNotifyOff" hidden>設定画面で通知をオンにすると使えます。</div>
         <div class="helptext" id="n-notify"><div class="note">空のままでもかまいません。そのときは、予定の始まりが決まっていればその<b>1時間前</b>、決まっていなければ<b>前の日の昼12時</b>に届きます。ここに入れると、その時刻に変わります。</div></div>
       </div>
-      <button class="btn pri" id="dEvAdd">予定を追加</button>
+      <!-- ふだんは「予定を追加」の1つ。編集中だけ「やめる」が横に出る -->
+      <div class="btnrow">
+        <button class="btn" id="dEvCancel" hidden>やめる</button>
+        <button class="btn pri" id="dEvAdd">予定を追加</button>
+      </div>
     </div>
   </div>
 </div>

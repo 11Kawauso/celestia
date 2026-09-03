@@ -228,6 +228,7 @@ main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
 .row.done{background:color-mix(in srgb,var(--ok) 9%,var(--bg2));border-color:color-mix(in srgb,var(--ok) 26%,var(--line))}
 .row.clear{border-color:var(--ok)}
 .row.locked{opacity:.55}
+.row.editing{border-color:var(--dawn)}   /* いま下の欄で直している予定 */
 
 /* 報酬の受け取りボタン。
    灰色＝未クリア ／ 水色＝受け取れる ／ 緑＝受け取り済み ／ 灰色＋赤枠＝時間切れ */

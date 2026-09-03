@@ -769,16 +769,36 @@ $("#cYes").addEventListener("click", () => {
 });
 
 /* day sheet */
-let dayKey = null;
+let dayKey = null, dEditing = null;   // dEditing は編集中の予定の id（追加のときは null）
 function openDay(k) {
   dayKey = k;
   const [y, m, d] = k.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   $("#dTitle").textContent = m + "月" + d + "日（" + DOW[dt.getDay()] + "）";
+  clearDayForm();
   paintDay();
+  openSheet("#sheetD");
+}
+/* 入力欄をまっさらに戻す（＝追加のモードに戻す） */
+function clearDayForm() {
+  dEditing = null;
   $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
   $("#dNotifyDate").value = ""; $("#dNotifyTime").value = "";
-  openSheet("#sheetD");
+  $("#dEvAdd").textContent = "予定を追加";
+  $("#dEvCancel").hidden = true;
+}
+/* その予定を入力欄に写して、編集のモードにする */
+function editEvent(id) {
+  const e = (st.events[dayKey] || []).find(x => x.id === id); if (!e) return;
+  dEditing = id;
+  $("#dEvName").value = e.title;
+  $("#dEvTime").value = e.time; $("#dEvEnd").value = e.end;
+  $("#dNotifyDate").value = e.notify ? e.notify.slice(0, 10) : "";
+  $("#dNotifyTime").value = e.notify ? e.notify.slice(11) : "";
+  $("#dEvAdd").textContent = "保存する";
+  $("#dEvCancel").hidden = false;
+  paintDay();
+  $("#dEvName").focus();
 }
 function paintDay() {
   const k = dayKey;
@@ -789,7 +809,9 @@ function paintDay() {
 
   const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
-    '<div class="row"><div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
+    '<div class="row' + (e.id === dEditing ? " editing" : "") + '">' +
+    '<button class="edit" data-act="evedit" data-id="' + esc(e.id) + '" aria-label="この予定を編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
+    '<div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
     (evSpan(e) || e.notify ? '<div class="chips">' +
       (evSpan(e) ? '<span class="chip time">' + esc(evSpan(e)) + "</span>" : "") +
       (e.notify ? '<span class="chip">通知 ' + esc(stampText(e.notify)) + "</span>" : "") +
@@ -811,20 +833,26 @@ $("#dEvAdd").addEventListener("click", () => {
   // 日が空なら予定の日、時刻が空なら昼12時。どちらも空なら「決めていない」。
   const nd = $("#dNotifyDate").value, nt = $("#dNotifyTime").value;
   const notify = canNotify() && (nd || nt) ? (nd || dayKey) + "T" + (nt || "12:00") : "";
-  (st.events[dayKey] || (st.events[dayKey] = []))
-    .push({ id: uid(), title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value, notify: notify });
-  $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
-  $("#dNotifyDate").value = ""; $("#dNotifyTime").value = "";
+  const data = { title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value, notify: notify };
+  const list = st.events[dayKey] || (st.events[dayKey] = []);
+  const target = dEditing && list.find(x => x.id === dEditing);
+  if (target) Object.assign(target, data);            // 編集中なら上書き
+  else list.push(Object.assign({ id: uid() }, data)); // そうでなければ足す
+  clearDayForm();
   save(); paintDay(); renderCal(); render();
 });
+$("#dEvCancel").addEventListener("click", () => { clearDayForm(); paintDay(); });
 $("#dClose").addEventListener("click", () => closeSheet("#sheetD"));
 $("#dEvents").addEventListener("click", e => {
-  const b = e.target.closest('[data-act="evdel"]'); if (!b) return;
-  const id = b.dataset.id, ev = (st.events[dayKey] || []).find(x => x.id === id);
-  if (!ev) return;
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = b.dataset.id;
+  if (b.dataset.act === "evedit") { editEvent(id); return; }
+  if (b.dataset.act !== "evdel") return;
+  const ev = (st.events[dayKey] || []).find(x => x.id === id); if (!ev) return;
   askConfirm("この予定を消しますか", ev.title, () => {
     st.events[dayKey] = (st.events[dayKey] || []).filter(x => x.id !== id);
     if (!st.events[dayKey].length) delete st.events[dayKey];
+    if (dEditing === id) clearDayForm();   // 編集中のものを消したら、入力欄も戻す
     save(); paintDay(); renderCal(); render();
   });
 });
