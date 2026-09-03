@@ -636,7 +636,18 @@ function closeSheets() {                       // 全部たたむ（タブを移
   $("#scrim").classList.remove("on");
   $$(".sheet").forEach(x => x.classList.remove("on"));
 }
-$("#scrim").addEventListener("click", closeSheets);
+/* シートの外を押したら閉じる。閉じるのはいちばん手前の1枚だけなので、
+   ステータス画面の上でミッションを編集していても、後ろまでは消えない。
+   つかまえるのは capture（降りてくる途中）。この時点ではまだ押した先の処理が
+   走っていないので、「開くための一押し」で開いたそばから閉じることがない。
+   閉じるときはその一押しをここで止める。うしろのボタンまで押されないように。 */
+document.addEventListener("click", e => {
+  const top = $(".sheet.on:not(.side)") || $(".sheet.on");   // 下から出るシートのほうが手前
+  if (!top || e.target.closest(".pop,.popveil")) return;
+  if (e.target.closest(".sheet") === top) return;            // 中を押したときは閉じない
+  e.stopPropagation(); e.preventDefault();
+  closeSheet("#" + top.id);
+}, true);
 /* 右上の小さいゲージ＝レベルとミッションの入口 */
 $("#openStatus").addEventListener("click", () => openSheet("#sheetS"));
 $("#sClose").addEventListener("click", () => closeSheet("#sheetS"));
