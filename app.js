@@ -155,6 +155,7 @@ async function mirror() {
 let saveWarned = false;
 function save() {
   mirror();
+  pingsLater();
   try { localStorage.setItem(LS, JSON.stringify(st)); }
   catch (e) {
     if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。端末の空き容量を確認してください。", true); }
@@ -1176,14 +1177,19 @@ function paintNotify() {
 }
 $("#notifyTog").addEventListener("click", async () => {
   if ($("#notifyTog").disabled) return;
-  if (canNotify()) { st.notify = false; save(); paintNotify(); return; }   // オフにする
+  if (canNotify()) {                                   // オフにする
+    st.notify = false; save(); paintNotify();
+    pushOff().catch(() => {});
+    return;
+  }
   let perm = Notification.permission;
   if (perm === "default") {
     try { perm = await Notification.requestPermission(); } catch (e) { perm = Notification.permission; }
   }
-  st.notify = perm === "granted";
-  save(); paintNotify();
-  if (perm !== "granted") setMsg("通知は許可されませんでした。", true);
+  if (perm !== "granted") { save(); paintNotify(); setMsg("通知は許可されませんでした。", true); return; }
+  st.notify = true; save(); paintNotify();
+  try { await pushOn(); setMsg("通知の受付をすませました。"); }
+  catch (err) { st.notify = false; save(); paintNotify(); setMsg("受付に失敗しました：" + err.message, true); }
 });
 /* 通知係（Service Worker）の支度ができるまで待つ。
    file: で開いたときなど、いつまでも支度ができない場合があるので、
@@ -1205,6 +1211,112 @@ $("#notifyTest").addEventListener("click", async () => {
   }
 });
 
+/* ---------- 通知のサーバー（Supabase） ---------- */
+/* ここに書いてある鍵は「人目に触れてよい鍵」。表の読み出しはサーバー側の決まり（RLS）で
+   全部止めてあるので、鍵を持っていても中身は取り出せない。
+   サーバーに置くのは「いつ・どの番号の予定を叩くか」だけ。
+   予定の名前もレベルも端末の中（sw.js が読む控え）にしか無い。 */
+const SB_URL = "https://dtxrdhtseahscofxpzfh.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHJkaHRzZWFoc2NvZnhwemZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0MzQ1NjksImV4cCI6MjEwNDAxMDU2OX0.bYNpgxHJczISeWGxbsDUsBU7jo5RRSS-yq5lvZM2lHk";
+const VAPID_PUB = "BDOVCUeTSV8vTSKRl53tgj8HIJe5aeD6OopmwMPQoihw10hH2fXKOa4Z3jneUjIlaHDxU45NRTqQfoAQpqvn65s";
+const SB_AUTH = "celestia.auth";   // 匿名の身分証のしまい場所
+
+const b64pad = t => t.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - t.length % 4) % 4);
+const b64bytes = t => Uint8Array.from(atob(b64pad(t)), c => c.charCodeAt(0));
+const uidOf = t => JSON.parse(atob(b64pad(t.split(".")[1]))).sub;   // 身分証に書かれている自分の番号
+
+/* 匿名の身分証をとる。はじめの一度だけ作り、あとは期限が切れる前に更新する。
+   名前もメールも要らない。「自分の行しか触れない」ための札でしかない。 */
+async function sbToken() {
+  let a = null;
+  try { a = JSON.parse(localStorage.getItem(SB_AUTH) || "null"); } catch (e) { a = null; }
+  const now = Math.floor(Date.now() / 1000);
+  if (a && a.access_token && a.expires_at > now + 60) return a.access_token;
+
+  const path = a && a.refresh_token ? "/auth/v1/token?grant_type=refresh_token" : "/auth/v1/signup";
+  const body = a && a.refresh_token ? { refresh_token: a.refresh_token } : {};
+  const res = await fetch(SB_URL + path, {
+    method: "POST",
+    headers: { apikey: SB_KEY, "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    if (a) { localStorage.removeItem(SB_AUTH); return sbToken(); }   // 更新に失敗したら作り直す
+    throw new Error("通知の受付にとどけ出られませんでした");
+  }
+  const j = await res.json();
+  const keep = {
+    access_token: j.access_token, refresh_token: j.refresh_token,
+    expires_at: now + (j.expires_in || 3600)
+  };
+  localStorage.setItem(SB_AUTH, JSON.stringify(keep));
+  return keep.access_token;
+}
+/* 表に書く。読み出しは許していないので、返事は要らない（return=minimal）。 */
+async function sbWrite(path, method, body, prefer) {
+  const t = await sbToken();
+  const res = await fetch(SB_URL + "/rest/v1/" + path, {
+    method: method,
+    headers: {
+      apikey: SB_KEY, Authorization: "Bearer " + t, "content-type": "application/json",
+      Prefer: "return=minimal" + (prefer ? "," + prefer : "")
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) throw new Error(method + " " + path + " → " + (await res.text()));
+  return t;
+}
+
+/* 鳴らす予定を置き直す。送るのは番号・日付・時刻だけで、名前は送らない。
+   過ぎたものは送らない。多すぎるときは近い順に200件まで。 */
+async function syncPings() {
+  const t = await sbToken(), owner = uidOf(t), now = Date.now(), rows = [];
+  Object.keys(st.events).forEach(k => {
+    st.events[k].forEach(e => {
+      const at = new Date(notifyAt(k, e));      // 端末の時計で読む＝その土地の時刻
+      if (at.getTime() > now) rows.push({ owner: owner, event_id: e.id, day_key: k, fire_at: at.toISOString() });
+    });
+  });
+  rows.sort((a, b) => a.fire_at.localeCompare(b.fire_at));
+  await sbWrite("pings?owner=eq." + owner, "DELETE");
+  if (rows.length) await sbWrite("pings", "POST", rows.slice(0, 200));
+  return rows.length;
+}
+/* 保存のたびに呼ばれる。まとめて少し待ってから送る（打つたびに通信しないため）。 */
+let pingTimer = null;
+function pingsLater() {
+  if (!canNotify()) return;
+  clearTimeout(pingTimer);
+  pingTimer = setTimeout(() => { syncPings().catch(() => {}); }, 2000);
+}
+
+/* 通知の宛先をサーバーに預ける（オンにしたとき） */
+async function pushOn() {
+  const reg = await swReady();
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: b64bytes(VAPID_PUB)
+    });
+  }
+  const t = await sbToken();
+  await sbWrite("devices?on_conflict=owner", "POST",
+    { owner: uidOf(t), sub: sub.toJSON(), updated_at: new Date().toISOString() },
+    "resolution=merge-duplicates");
+  await syncPings();
+}
+/* 宛先も予定も引きあげる（オフにしたとき） */
+async function pushOff() {
+  try {
+    const reg = await swReady();
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+  } catch (e) { /* 宛先を消せなくても、下で予定は引きあげる */ }
+  const t = await sbToken(), owner = uidOf(t);
+  await sbWrite("pings?owner=eq." + owner, "DELETE");
+  await sbWrite("devices?owner=eq." + owner, "DELETE");
+}
+
 $("#themePills").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
   st.theme = b.dataset.t; save(); applyTheme();
@@ -1220,6 +1332,7 @@ if (window.matchMedia) {
 applyTheme();
 mirror();
 paintNotify();
+if (canNotify()) syncPings().catch(() => {});
 updateSpeech(new Date());
 render();
 let lastDay = keyOf(new Date());
