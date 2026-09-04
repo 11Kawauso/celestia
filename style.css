@@ -170,8 +170,11 @@ main{
 .portrait .rune{font-family:"Shippori Mincho B1",serif;font-size:60px;color:var(--ink3);opacity:.45}
 /* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。
    上に空きがあるぶんは全部あけて、下タブのすぐ上に置く（margin-top:auto）。
-   絵が縦に長くて入りきらないときは、絵といっしょに上へ転がっていく。 */
+   そこへ貼り付けてあるので、絵が縦に長くて転がるときも、ここから動かず絵だけが後ろを流れる。
+   bottom:0 は「main の内側の下端」を指す。貼りつく前と同じ場所なので、動き出しでずれない。
+   重なりは絵（0〜2）より上・下タブより下。 */
 .speech{
+  position:sticky;bottom:0;z-index:3;
   margin-top:auto;
   background:var(--bg2);border:1px solid var(--line);
   padding:17px 18px;box-shadow:var(--shadow);
