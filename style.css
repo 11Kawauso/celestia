@@ -7,6 +7,8 @@
   --sun:#b8534f; --sat:#1f52c9; --aqua:#1d8ab0;
   --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
   --r:14px;
+  /* ヘッダーの高さ。中身が入るまでの仮の値で、実際の高さは app.js が測って入れなおす。 */
+  --toph:calc(env(safe-area-inset-top) + 45px);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -67,8 +69,13 @@ button{background:none;border:none;cursor:pointer}
 ::-webkit-scrollbar-corner{background:transparent}
 
 .wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative}
+/* ヘッダーは画面の上に貼り付けてある。後ろがどう動いてもここから動かない。
+   幅と中央寄せは本体（.wrap）にそろえてあり、その下にあける余白は main が --toph で受けもつ。
+   重なりの順番は、下タブ（30）より上・右から出るパネル（41〜）より下。 */
 .top{
-  position:sticky;top:0;z-index:20;background:var(--bg);
+  position:fixed;top:0;z-index:35;left:0;right:0;margin:0 auto;
+  width:100%;max-width:480px;
+  background:var(--bg);
   background:color-mix(in srgb,var(--bg) 88%,transparent);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
@@ -109,7 +116,7 @@ button{background:none;border:none;cursor:pointer}
 }
 .pop:not(.below) .poparrow{bottom:-6px;border-top:0;border-left:0}
 .pop.below .poparrow{top:-6px;border-bottom:0;border-right:0}
-main{flex:1;padding:16px 16px calc(env(safe-area-inset-bottom) + 88px)}
+main{flex:1;padding:calc(var(--toph) + 16px) 16px calc(env(safe-area-inset-bottom) + 88px)}
 .view{display:none;flex-direction:column;gap:18px}
 .view.on{display:flex}
 
