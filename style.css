@@ -174,8 +174,12 @@ main{
 .speech{
   margin-top:auto;
   background:var(--bg2);border:1px solid var(--line);
-  padding:13px 15px;box-shadow:var(--shadow);
-  font-size:14px;line-height:1.75;overflow-wrap:anywhere;
+  padding:17px 18px;box-shadow:var(--shadow);
+  font-size:15px;line-height:1.8;overflow-wrap:anywhere;
+  /* 短いひと言でも枠がやせないように、3行ぶんの高さは必ず取る。
+     枠の高さが場面ごとに変わらないので、下タブとの間隔も動かない。 */
+  min-height:calc(5.4em + 36px);
+  display:flex;align-items:center;
 }
 
 /* ---- character panel ---- */
