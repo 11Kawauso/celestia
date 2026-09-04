@@ -32,12 +32,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
 html,body{height:100%}
-/* スクロールバーの場所を常に空けておく。
-   中身は中央寄せなので、これが無いとスクロールするタブ（ホーム）と
-   しないタブ（目標など）で左右にずれてしまう。
-   iPhone のようにバーが重ねて出る環境では何も起きない。 */
-html{scrollbar-gutter:stable}
+/* 画面そのものは動かさない。上下に転がるのは main の中だけ（下の main を見よ）。
+   こうしておくと、iPhone で画面を引っぱったときの跳ねかえりで
+   上のヘッダーや下のタブが持ちあがることがない。 */
 body{
+  overflow:hidden;
   background:var(--bg); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
   font-size:15px; line-height:1.6;
@@ -68,7 +67,7 @@ button{background:none;border:none;cursor:pointer}
 }
 ::-webkit-scrollbar-corner{background:transparent}
 
-.wrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative}
+.wrap{max-width:480px;margin:0 auto;height:100%;display:flex;flex-direction:column;position:relative}
 /* ヘッダーは画面の上に貼り付けてある。後ろがどう動いてもここから動かない。
    幅と中央寄せは本体（.wrap）にそろえてあり、その下にあける余白は main が --toph で受けもつ。
    重なりの順番は、下タブ（30）より上・右から出るパネル（41〜）より下。 */
@@ -116,7 +115,16 @@ button{background:none;border:none;cursor:pointer}
 }
 .pop:not(.below) .poparrow{bottom:-6px;border-top:0;border-left:0}
 .pop.below .poparrow{top:-6px;border-bottom:0;border-right:0}
-main{flex:1;padding:calc(var(--toph) + 16px) 16px calc(env(safe-area-inset-bottom) + 88px)}
+/* 上下に転がるのはここだけ。上の余白はヘッダーの高さぶんで、中身はその裏へもぐっていく。
+   スクロールバーの場所は左右とも空けておく。片側だけだと中身が中央からずれて、
+   転がるタブ（設定など）と転がらないタブ（ホーム）で左右にぶれてしまう。
+   iPhone のようにバーが重ねて出る環境では何も起きない。 */
+main{
+  flex:1;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-gutter:stable both-edges;
+  padding:calc(var(--toph) + 16px) 16px calc(env(safe-area-inset-bottom) + 88px);
+}
 .view{display:none;flex-direction:column;gap:18px}
 .view.on{display:flex}
 

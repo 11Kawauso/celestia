@@ -1034,7 +1034,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   closePop();
-  window.scrollTo(0, 0);
+  $("main").scrollTop = 0;                              // 転がるのは main の中なので、戻すのもここ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") { $("#backup").value = JSON.stringify(st); paintNotify(); }
 }));
