@@ -158,7 +158,9 @@ main{
 }
 
 .portrait{
-  width:100%;aspect-ratio:3/4;max-height:52vh;flex:none;   /* 縦が狭くても つぶさない */
+  /* 枠の形は 2:3 の縦長。ただし画面が低いときは max-height のほうが先に効くので、
+     そのぶん横長に見える。もっと縦に伸ばしたいときは、まず max-height を上げる。 */
+  width:100%;aspect-ratio:2/3;max-height:60vh;flex:none;   /* 縦が狭くても つぶさない */
   border-radius:18px;overflow:hidden;
   background:var(--bg3);border:1px solid var(--line);
   display:grid;place-items:center;
