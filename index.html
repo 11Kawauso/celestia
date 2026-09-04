@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- ステータスバーは iOS にまかせる。black-translucent にすると画面いっぱいの窓に見えて、
+     実際に渡される高さだけが上の切り欠きぶん（59px）短くなり、下に届かない帯ができる。
+     外しておくと、窓をステータスバーの下から画面の底までぴったり置いてくれる。
+     この行はホーム画面に追加した時点の設定が使われるので、変えたら入れ直しが要る。 -->
 <meta name="apple-mobile-web-app-title" content="セレスティア">
 <meta name="theme-color" content="#0d1020">
 <title>セレスティア</title>
