@@ -106,7 +106,15 @@ button{background:none;border:none;cursor:pointer}
   position:fixed;z-index:45;left:0;top:0;
   background:var(--bg2);border:1px solid var(--line);border-radius:12px;
   padding:11px 13px;box-shadow:0 8px 30px rgba(10,8,20,.3);
+  /* 出るときも消えるときも、ふわりと。矢印のある側を軸にして、そこから開く。
+     位置は app.js が先に決めてから .on を付けるので、途中から動き出すことはない。
+     出ている時間は app.js の POP_FADE と合わせてある。 */
+  opacity:0;transform:scale(.95);pointer-events:none;   /* 消えかけの小窓が押されないように */
+  transform-origin:50% 100%;
+  transition:opacity .16s ease, transform .16s cubic-bezier(.2,.9,.3,1);
 }
+.pop.below{transform-origin:50% 0}
+.pop.on{opacity:1;transform:scale(1);pointer-events:auto}
 .popbody{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:9px}
 .popbody .note{font-size:12.5px}
 .poparrow{
@@ -301,6 +309,7 @@ main{
 .cell{
   aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
+  transition:border-color .16s ease;        /* 長押しの金色の枠も、小窓と同じ速さで */
   /* 長押しで小窓を出すので、そのとき端末側の「コピー」や文字選択が割りこまないようにする */
   -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
 }

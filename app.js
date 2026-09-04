@@ -955,9 +955,10 @@ function flash(el) {
 /* ---------- help popover ---------- */
 /* 説明はその場で開かず、最前面の小窓に出す。
    基本はボタンの上。上に入りきらないときだけ下に回す。 */
-let popFor = null;
+let popFor = null, popHideT = null;
 const POP_EDGE = 12;   // 画面の端からあけておく余白
 const POP_GAP = 9;     // ボタンとの間隔
+const POP_FADE = 200;  // 片づけるまでの時間。style.css の .pop の 0.16s より少し長くしてある
 
 function openPop(btn) {
   const src = document.getElementById(btn.dataset.help); if (!src) return;
@@ -967,19 +968,26 @@ function openPop(btn) {
    veil は「後ろ一面の受け皿」。押して閉じたい長押しのときは付け、
    離れれば消えるPCの重ね置きでは付けない（付けると下の日が押せなくなる）。 */
 function showPop(anchor, html, veil) {
-  const body = $("#popBody");
+  const pop = $("#pop"), body = $("#popBody");
   body.innerHTML = html;
   // 複製した中身の id は落とす。元の要素と重複させないため。
   body.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
-  $("#pop").hidden = false; $("#popVeil").hidden = !veil;
+  clearTimeout(popHideT);                 // 消えかけていたら引きとめる
+  pop.hidden = false; $("#popVeil").hidden = !veil;
   if (popFor) markPop(popFor, false);
   popFor = anchor; markPop(anchor, true);
-  placePop();
+  placePop();                             // 場所を決めてから
+  void pop.offsetWidth;                   // ここまでを一度描かせて（これが無いと出る動きが飛ぶ）
+  pop.classList.add("on");                // ふわりと出す
 }
 function closePop() {
   if (!popFor) return;
+  const pop = $("#pop");
   markPop(popFor, false); popFor = null;
-  $("#pop").hidden = true; $("#popVeil").hidden = true;
+  pop.classList.remove("on");
+  $("#popVeil").hidden = true;            // 受け皿は先に外す。消えるのを待たずに下を押せるように
+  clearTimeout(popHideT);
+  popHideT = setTimeout(() => { pop.hidden = true; }, POP_FADE);
 }
 function markPop(btn, on) {
   if (btn.classList.contains("cell")) { btn.classList.toggle("held", on); return; }
