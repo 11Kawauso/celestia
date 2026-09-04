@@ -1360,3 +1360,56 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     .then(reg => reg.update())
     .catch(() => {});
 }
+
+/* ---------- ★一時的な調べもの（原因が分かったら消す） ---------- */
+/* 下に出る「間」の正体を知るため、端末が答える寸法をそのまま画面に出す。 */
+(function debugBox() {
+  const box = document.createElement("div");
+  box.id = "dbgbox";
+  box.style.cssText =
+    "margin:0 0 12px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;" +
+    "background:var(--bg2);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;" +
+    "white-space:pre-wrap;word-break:break-all";
+
+  // 端末に「この単位は何pxか」を実際に測らせるための当て木
+  function probe(css) {
+    const p = document.createElement("div");
+    p.style.cssText = "position:absolute;left:-9999px;top:0;width:1px;" + css;
+    document.body.appendChild(p);
+    const cs = getComputedStyle(p);
+    const r = {
+      h: p.getBoundingClientRect().height,
+      pt: parseFloat(cs.paddingTop) || 0,
+      pb: parseFloat(cs.paddingBottom) || 0
+    };
+    p.remove();
+    return r;
+  }
+
+  function show() {
+    const env = probe("padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)");
+    const dvh = probe("height:100dvh").h, svh = probe("height:100svh").h, lvh = probe("height:100lvh").h;
+    const vv = window.visualViewport;
+    const nav = document.querySelector(".nav").getBoundingClientRect();
+    const body = document.body.getBoundingClientRect();
+    box.textContent = [
+      "screen " + screen.width + "x" + screen.height + " dpr" + devicePixelRatio,
+      "inner  " + innerWidth + "x" + innerHeight,
+      "client " + document.documentElement.clientWidth + "x" + document.documentElement.clientHeight,
+      "visual " + (vv ? Math.round(vv.width) + "x" + Math.round(vv.height) + " off" + Math.round(vv.offsetTop) + " s" + vv.scale : "-"),
+      "dvh " + dvh + " / svh " + svh + " / lvh " + lvh,
+      "env top " + env.pt + " bottom " + env.pb,
+      "body h " + body.height.toFixed(1) + "  nav " + nav.top.toFixed(1) + "-" + nav.bottom.toFixed(1),
+      "standalone " + (navigator.standalone === undefined ? "?" : navigator.standalone) +
+        " / dm " + (matchMedia("(display-mode: standalone)").matches ? "standalone" : "browser"),
+      "scrollY " + window.scrollY + " docH " + document.documentElement.scrollHeight
+    ].join("\n");
+  }
+
+  const home = document.getElementById("v-home");
+  home.insertBefore(box, home.firstChild);
+  show();
+  addEventListener("resize", show);
+  if (window.visualViewport) visualViewport.addEventListener("resize", show);
+  setInterval(show, 1000);
+})();
