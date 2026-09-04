@@ -393,9 +393,12 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   border-radius:20px 20px 0 0;
   padding:16px 16px calc(env(safe-area-inset-bottom) + 18px);
   transform:translateY(102%);transition:transform .26s cubic-bezier(.3,.9,.3,1);
-  max-height:88vh;overflow:auto;box-shadow:0 -12px 40px rgba(10,8,20,.28);
+  max-height:88vh;overflow:auto;
 }
-.sheet.on{transform:translateY(0)}
+/* 影は開いているときだけ。閉じたシートは画面のすぐ外で待っているので、
+   影を付けっぱなしにすると、ぼかしのぶんだけ画面の端ににじんで、
+   右と下がうっすら暗くなる（右に2枚、下に3枚ぶん重なる）。 */
+.sheet.on{transform:translateY(0);box-shadow:0 -12px 40px rgba(10,8,20,.28)}
 /* 日付の詳細だけは、下からではなく右からすべって出す。
    画面いっぱいの別ページのあつかいなので、閉じるのは左上の×。 */
 .sheet.side{
@@ -403,10 +406,9 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   border-top:0;border-left:1px solid var(--line);border-radius:0;
   padding-top:calc(env(safe-area-inset-top) + 14px);
   transform:translateX(100%);
-  box-shadow:-12px 0 40px rgba(10,8,20,.28);
   touch-action:pan-y;                 /* 上下は端末まかせ、横なぞりは app.js が受けもつ */
 }
-.sheet.side.on{transform:translateX(0)}
+.sheet.side.on{transform:translateX(0);box-shadow:-12px 0 40px rgba(10,8,20,.28)}
 .sidehead{display:flex;align-items:center;gap:11px}
 .xbtn{
   width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;
