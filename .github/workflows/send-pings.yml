@@ -1,15 +1,10 @@
 # セレスティア — 通知の時刻が来た予定を送らせる係。
 #
-# Supabase の関数（send-pings）を、5分おきに叩くだけ。
-# 中の判断は全部あちらがやるので、ここは「起こす」だけの役目。
+# Supabase の関数（send-pings）を叩くだけ。中の判断は全部あちらがやる。
 #
 # ふだんは動かない。Supabase 側の cron（毎分）が本番で、こちらは予備。
 # 使うときは下の schedule の行の # を外す。そうすると5分おきに動きだす。
 # 手で1回だけ走らせたいときは、GitHub の Actions タブ →「send-pings」→ Run workflow。
-#
-# 鍵について：ここに書いてある anon キーは、もともとアプリ（app.js）に
-# 埋めこんである公開用の鍵。表の中身は読めないようにしてあるので、
-# ここに書いても新しく漏れるものは無い。
 
 name: send-pings
 
@@ -22,10 +17,13 @@ jobs:
   send:
     runs-on: ubuntu-latest
     steps:
+      # 合言葉が要る。GitHub の Settings → Secrets and variables → Actions で
+      # CRON_SECRET という名前で、Supabase 側に入れたのと同じ文字を登録しておくこと。
+      # 登録せずに動かすと 401 で断られる。
       - name: 時刻が来た予定を送らせる
         run: |
           curl -sS -m 60 -X POST \
             "https://dtxrdhtseahscofxpzfh.supabase.co/functions/v1/send-pings" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHJkaHRzZWFoc2NvZnhwemZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0MzQ1NjksImV4cCI6MjEwNDAxMDU2OX0.bYNpgxHJczISeWGxbsDUsBU7jo5RRSS-yq5lvZM2lHk" \
+            -H "x-celestia-key: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"
           echo

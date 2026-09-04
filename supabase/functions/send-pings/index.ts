@@ -4,8 +4,13 @@
 // この関数が知っているのは「どの端末の、どの番号の予定か」だけで、
 // 予定の名前もレベルも知らない。文面は端末側（sw.js）が組み立てる。
 //
-// 使う秘密：VAPID_PUBLIC / VAPID_PRIVATE（Edge Functions の Secrets に入れておく）
+// 使う秘密：VAPID_PUBLIC / VAPID_PRIVATE / CRON_SECRET
+//           （Edge Functions の Secrets に入れておく）
 //           SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY は自動で入っている。
+//
+// この関数は JWT の検証を切ってある（pg_net が Authorization ヘッダを
+// うまく載せられず、cron から呼べなかったため）。代わりに合言葉で守る。
+// 呼ぶ側は x-celestia-key に CRON_SECRET と同じ文字を入れること。
 
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -22,7 +27,13 @@ webpush.setVapidDetails(
   Deno.env.get("VAPID_PRIVATE")!,
 );
 
-Deno.serve(async () => {
+const SECRET = Deno.env.get("CRON_SECRET");
+
+Deno.serve(async (req) => {
+  // 合言葉の照合。決めていないときは、開けっぱなしにせず断る。
+  if (!SECRET) return json({ error: "CRON_SECRET が設定されていません" }, 500);
+  if (req.headers.get("x-celestia-key") !== SECRET) return json({ error: "どちら様ですか" }, 401);
+
   const now = new Date().toISOString();
 
   // 時刻が来たものを集める
