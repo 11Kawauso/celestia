@@ -136,6 +136,12 @@ main{
 #v-home{position:relative}
 .stage{display:flex;flex-direction:column;gap:12px;flex:1}
 
+/* ゲージの入れ物。高さゼロの帯を main の上端に貼り付けてあるので、
+   中身を転がしてもゲージは右上から動かない。
+   top:0 は「main の内側の上端」を指す。貼りつく前と同じ場所なので、動き出しでずれない。
+   下の -18px は、この帯と絵のあいだにできる .view のすきまを打ち消すぶん。 */
+.halodock{position:sticky;top:0;height:0;margin-bottom:-18px;z-index:2}
+
 /* 右上の小さいゲージ。輪の形は大きいほうと同じで、まんなかに今のレベルの数字。
    棘が輪の外に出るので、はみ出しは切らない。 */
 .minihalo{

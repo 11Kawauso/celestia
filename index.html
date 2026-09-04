@@ -29,14 +29,11 @@
   <main>
     <!-- HOME -->
     <section class="view on" id="v-home">
-      <div class="stage">
-        <div class="portrait" id="portrait"></div>
-        <div class="speech" id="speech"></div>
-      </div>
-
       <!-- 右上の小さいゲージ。押すとレベルとミッションが右から出てくる。
            輪の形と色の決まりは大きいほうと同じ（.rbg / .rfill / .spikes）。
-           グラデーションは取り違えないよう、こちらは haloGradS という別の名前にしてある。 -->
+           グラデーションは取り違えないよう、こちらは haloGradS という別の名前にしてある。
+           入れ物（.halodock）は高さゼロの帯で、転がしても右上から動かない役をする。 -->
+      <div class="halodock">
       <button class="minihalo" id="openStatus" aria-label="レベルとミッションを見る">
         <svg class="ring" viewBox="0 0 104 104" aria-hidden="true">
           <defs><linearGradient id="haloGradS" x1="0" y1="0" x2="1" y2="1">
@@ -54,6 +51,12 @@
         </svg>
         <span class="minilv" id="minilv">1</span>
       </button>
+      </div>
+
+      <div class="stage">
+        <div class="portrait" id="portrait"></div>
+        <div class="speech" id="speech"></div>
+      </div>
     </section>
 
     <!-- CALENDAR -->
