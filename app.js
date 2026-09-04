@@ -1186,10 +1186,17 @@ $("#notifyTog").addEventListener("click", async () => {
   if (perm === "default") {
     try { perm = await Notification.requestPermission(); } catch (e) { perm = Notification.permission; }
   }
-  if (perm !== "granted") { save(); paintNotify(); setMsg("通知は許可されませんでした。", true); return; }
+  if (perm !== "granted") { save(); paintNotify(); $("#notifyMsg").textContent = "通知は許可されませんでした。"; return; }
   st.notify = true; save(); paintNotify();
-  try { await pushOn(); setMsg("通知の受付をすませました。"); }
-  catch (err) { st.notify = false; save(); paintNotify(); setMsg("受付に失敗しました：" + err.message, true); }
+  $("#notifyMsg").textContent = "受付にとどけ出ています…";
+  try {
+    await pushOn();
+    paintNotify();
+  } catch (err) {
+    st.notify = false; save(); paintNotify();
+    // 何でしくじったかを、その場に出す。長い返事は途中まで。
+    $("#notifyMsg").textContent = "受付できませんでした：" + String(err && err.message || err).slice(0, 300);
+  }
 });
 /* 通知係（Service Worker）の支度ができるまで待つ。
    file: で開いたときなど、いつまでも支度ができない場合があるので、
@@ -1299,10 +1306,12 @@ async function pushOn() {
       userVisibleOnly: true, applicationServerKey: b64bytes(VAPID_PUB)
     });
   }
-  const t = await sbToken();
-  await sbWrite("devices?on_conflict=owner", "POST",
-    { owner: uidOf(t), sub: sub.toJSON(), updated_at: new Date().toISOString() },
-    "resolution=merge-duplicates");
+  // 上書き（upsert）ではなく、消してから入れ直す。
+  // 上書きは「今そこに何があるか」を読みにいくため、読み出しを許していないこの作りでは通らない。
+  const t = await sbToken(), owner = uidOf(t);
+  await sbWrite("devices?owner=eq." + owner, "DELETE");
+  await sbWrite("devices", "POST",
+    { owner: owner, sub: sub.toJSON(), updated_at: new Date().toISOString() });
   await syncPings();
 }
 /* 宛先も予定も引きあげる（オフにしたとき） */
