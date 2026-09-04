@@ -301,7 +301,10 @@ main{
 .cell{
   aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
+  /* 長押しで小窓を出すので、そのとき端末側の「コピー」や文字選択が割りこまないようにする */
+  -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
 }
+.cell.held{border-color:var(--dawn)}   /* 長押しで小窓を出しているあいだの目印 */
 .cell.pad{background:transparent;border-color:transparent}
 .cell.now{border-color:var(--dawn);box-shadow:0 0 0 1px var(--dawn) inset}
 .cell .d{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink2)}
@@ -313,6 +316,16 @@ main{
 .cell .dot.due{background:var(--dawn)}
 .cell .mini{position:absolute;left:5px;right:5px;bottom:5px;height:3px;border-radius:99px;background:var(--bg3);overflow:hidden}
 .cell .mini i{display:block;height:100%;background:linear-gradient(90deg,var(--dusk),var(--dawn))}
+
+/* 日を長押し（PCでは重ねる）と出る小窓の中身。入れ物と位置は説明の小窓と同じ。 */
+.daypop{display:flex;flex-direction:column;gap:7px;min-width:148px}
+.dpdate{font-size:13px;font-weight:700}
+.dpholi{font-size:12.5px;color:var(--sun)}
+.dplist{list-style:none;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.dplist li{display:flex;gap:7px;align-items:baseline}
+.dptime{color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dpname{overflow-wrap:anywhere}
+.dpnone{font-size:12.5px;color:var(--ink3)}
 
 /* ---- goals ---- */
 .donehead{font-size:11px;letter-spacing:.12em;color:var(--ink3);margin-top:6px;padding:0 2px}

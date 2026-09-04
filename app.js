@@ -961,13 +961,19 @@ const POP_GAP = 9;     // ボタンとの間隔
 
 function openPop(btn) {
   const src = document.getElementById(btn.dataset.help); if (!src) return;
+  showPop(btn, src.innerHTML, true);
+}
+/* 中身と、どこにぶら下げるかを渡せば、この小窓はなんでも出せる。
+   veil は「後ろ一面の受け皿」。押して閉じたい長押しのときは付け、
+   離れれば消えるPCの重ね置きでは付けない（付けると下の日が押せなくなる）。 */
+function showPop(anchor, html, veil) {
   const body = $("#popBody");
-  body.innerHTML = src.innerHTML;
+  body.innerHTML = html;
   // 複製した中身の id は落とす。元の要素と重複させないため。
   body.querySelectorAll("[id]").forEach(el => el.removeAttribute("id"));
-  $("#pop").hidden = false; $("#popVeil").hidden = false;
+  $("#pop").hidden = false; $("#popVeil").hidden = !veil;
   if (popFor) markPop(popFor, false);
-  popFor = btn; markPop(btn, true);
+  popFor = anchor; markPop(anchor, true);
   placePop();
 }
 function closePop() {
@@ -976,6 +982,7 @@ function closePop() {
   $("#pop").hidden = true; $("#popVeil").hidden = true;
 }
 function markPop(btn, on) {
+  if (btn.classList.contains("cell")) { btn.classList.toggle("held", on); return; }
   btn.classList.toggle("on", on);
   btn.setAttribute("aria-expanded", on ? "true" : "false");
   btn.setAttribute("aria-label", on ? "説明をかくす" : "説明を見る");
@@ -1013,6 +1020,70 @@ function placePop() {
 }
 $("#popVeil").addEventListener("click", closePop);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+
+/* ---------- 日を長押しして、その日の中身を見る ---------- */
+/* 指では長押し、マウスでは重ねるだけ。押した日の上に小窓が出る。
+   開けるのは中身だけで、書きかえは今までどおり日をふつうに押して出す画面のほう。 */
+const HOLD_MS = 420;    // これだけ押しつづけたら小窓を出す
+const HOLD_SLOP = 10;   // 指がこれだけずれたら、なぞりとみなして取り消す
+const HOVER_MS = 200;   // マウスを重ねてから出るまで
+let holdTimer = null, holdFrom = null, holdDone = false;
+
+function dayPopHtml(k) {
+  const [y, m, dd] = k.split("-").map(Number);
+  const d = new Date(y, m - 1, dd);
+  const holi = holidayName(d);
+  const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
+  return '<div class="daypop">' +
+    '<div class="dpdate">' + y + "年" + m + "月" + dd + "日（" + DOW[d.getDay()] + "）</div>" +
+    (holi ? '<div class="dpholi">' + esc(holi) + "</div>" : "") +
+    (ev.length
+      ? '<ul class="dplist">' + ev.map(e => "<li>" +
+          (evSpan(e) ? '<span class="dptime">' + esc(evSpan(e)) + "</span>" : "") +
+          '<span class="dpname">' + esc(e.title) + "</span></li>").join("") + "</ul>"
+      : '<div class="dpnone">予定なし</div>') +
+    "</div>";
+}
+function stopHold() { clearTimeout(holdTimer); holdTimer = null; holdFrom = null; }
+function dayCellOf(e) { return e.target.closest(".cell[data-act='day']"); }
+
+const calGrid = $("#calGrid");
+calGrid.addEventListener("pointerdown", e => {
+  const cell = dayCellOf(e); if (!cell) return;
+  holdFrom = { x: e.clientX, y: e.clientY };
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    holdTimer = null; holdDone = true;          // このあとに来る click は飲みこむ
+    showPop(cell, dayPopHtml(cell.dataset.k), true);
+  }, HOLD_MS);
+});
+calGrid.addEventListener("pointermove", e => {
+  if (!holdTimer || !holdFrom) return;
+  if (Math.abs(e.clientX - holdFrom.x) > HOLD_SLOP ||
+      Math.abs(e.clientY - holdFrom.y) > HOLD_SLOP) stopHold();
+});
+["pointerup", "pointercancel"].forEach(t => calGrid.addEventListener(t, stopHold));
+/* 長押しで小窓を出したときは、指を離したときの一押しをここで止める。
+   止めないと、そのまま日の画面まで開いてしまう。 */
+calGrid.addEventListener("click", e => {
+  if (!holdDone) return;
+  holdDone = false;
+  e.stopPropagation(); e.preventDefault();
+}, true);
+
+/* PCはマウスを重ねるだけ。受け皿は付けないので、そのまま日を押せる。 */
+let hoverTimer = null;
+calGrid.addEventListener("pointerover", e => {
+  if (e.pointerType !== "mouse") return;
+  const cell = dayCellOf(e); if (!cell) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => showPop(cell, dayPopHtml(cell.dataset.k), false), HOVER_MS);
+});
+calGrid.addEventListener("pointerout", e => {
+  if (e.pointerType !== "mouse") return;
+  clearTimeout(hoverTimer);
+  if (popFor && popFor.classList.contains("cell")) closePop();
+});
 window.addEventListener("resize", placePop);
 window.addEventListener("scroll", placePop, true);
 
