@@ -1016,19 +1016,6 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); 
 window.addEventListener("resize", placePop);
 window.addEventListener("scroll", placePop, true);
 
-/* ---------- ヘッダーの高さ ---------- */
-/* ヘッダーは画面の上に貼り付けてあるので、その下にあける余白は main が受けもつ。
-   ノッチや字体の読みこみで高さが変わるため、決め打ちにせず実際に測って渡す。 */
-function measureTop() {
-  document.documentElement.style.setProperty("--toph", $(".top").offsetHeight + "px");
-}
-if (window.ResizeObserver) new ResizeObserver(measureTop).observe($(".top"));
-else {
-  window.addEventListener("resize", measureTop);
-  if (document.fonts) document.fonts.ready.then(measureTop).catch(() => {});
-}
-measureTop();
-
 /* ---------- tabs ---------- */
 $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));

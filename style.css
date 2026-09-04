@@ -7,8 +7,6 @@
   --sun:#b8534f; --sat:#1f52c9; --aqua:#1d8ab0;
   --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
   --r:14px;
-  /* ヘッダーの高さ。中身が入るまでの仮の値で、実際の高さは app.js が測って入れなおす。 */
-  --toph:calc(env(safe-area-inset-top) + 45px);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -32,11 +30,15 @@
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
 html,body{height:100%}
-/* 画面そのものは動かさない。上下に転がるのは main の中だけ（下の main を見よ）。
-   こうしておくと、iPhone で画面を引っぱったときの跳ねかえりで
-   上のヘッダーや下のタブが持ちあがることがない。 */
+/* 画面ぜんぶをこの縦の箱に収める。上からヘッダー・中身・下タブの順に積むだけで、
+   どれも「画面に貼りつけた要素」ではない。
+   iPhone は下のバーの出入りで見える高さが変わり、貼りつけた要素はそことずれて
+   すき間になることがある。積んであれば、100dvh が縮んだぶんだけ素直に詰まる。
+   上下に転がるのは main の中だけ（下の main を見よ）。 */
 body{
+  height:100dvh;                  /* dvh を知らない端末は上の height:100% で動く */
   overflow:hidden;
+  display:flex;flex-direction:column;
   background:var(--bg); color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
   font-size:15px; line-height:1.6;
@@ -67,13 +69,11 @@ button{background:none;border:none;cursor:pointer}
 }
 ::-webkit-scrollbar-corner{background:transparent}
 
-.wrap{max-width:480px;margin:0 auto;height:100%;display:flex;flex-direction:column;position:relative}
-/* ヘッダーは画面の上に貼り付けてある。後ろがどう動いてもここから動かない。
-   幅と中央寄せは本体（.wrap）にそろえてあり、その下にあける余白は main が --toph で受けもつ。
-   重なりの順番は、下タブ（30）より上・右から出るパネル（41〜）より下。 */
+.wrap{max-width:480px;width:100%;margin:0 auto;flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+/* ヘッダーは箱のいちばん上の段。転がるのは下の main の中だけなので、ここは動かない。
+   重なりの順番は、右から出るパネル（41〜）より下。 */
 .top{
-  position:fixed;top:0;z-index:35;left:0;right:0;margin:0 auto;
-  width:100%;max-width:480px;
+  position:relative;z-index:35;flex:none;
   background:var(--bg);
   background:color-mix(in srgb,var(--bg) 88%,transparent);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
@@ -115,18 +115,18 @@ button{background:none;border:none;cursor:pointer}
 }
 .pop:not(.below) .poparrow{bottom:-6px;border-top:0;border-left:0}
 .pop.below .poparrow{top:-6px;border-bottom:0;border-right:0}
-/* 上下に転がるのはここだけ。上の余白はヘッダーの高さぶんで、中身はその裏へもぐっていく。
+/* 上下に転がるのはここだけ。ヘッダーと下タブは外側にあるので、転がしても動かない。
    スクロールバーの場所は左右とも空けておく。片側だけだと中身が中央からずれて、
    転がるタブ（設定など）と転がらないタブ（ホーム）で左右にぶれてしまう。
    iPhone のようにバーが重ねて出る環境では何も起きない。 */
 main{
-  flex:1;min-height:0;
+  flex:1;min-height:0;display:flex;flex-direction:column;
   overflow-y:auto;overscroll-behavior:contain;
   scrollbar-gutter:stable both-edges;
-  padding:calc(var(--toph) + 16px) 16px calc(env(safe-area-inset-bottom) + 88px);
+  padding:16px;
 }
 .view{display:none;flex-direction:column;gap:18px}
-.view.on{display:flex}
+.view.on{display:flex;flex:1 0 auto}   /* 縦いっぱいに広げる。中身が長ければそのぶん伸びる */
 
 /* ---- キャラ画像とセリフ ---- */
 /* ホームは絵とセリフだけ。レベルとミッションは右上のゲージから呼び出す。
@@ -134,7 +134,7 @@ main{
    あいだが空くのは、そこを埋める絵が入るまでの姿
    （絵を大きくしたいときは .portrait の max-height を上げる）。 */
 #v-home{position:relative}
-.stage{display:flex;flex-direction:column;gap:12px}
+.stage{display:flex;flex-direction:column;gap:12px;flex:1}
 
 /* 右上の小さいゲージ。輪の形は大きいほうと同じで、まんなかに今のレベルの数字。
    棘が輪の外に出るので、はみ出しは切らない。 */
@@ -161,14 +161,10 @@ main{
 /* 絵が入るまでの仮置き */
 .portrait .rune{font-family:"Shippori Mincho B1",serif;font-size:60px;color:var(--ink3);opacity:.45}
 /* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。
-   下タブのすぐ上に貼り付けてあり、後ろがどう動いてもここから動かない。
-   下端の位置は main の下余白と同じ式なので、下タブとの間隔が揃う。
-   重なりの順番は、下タブ（30）より下・絵（0〜2）より上。
-   右から出るパネル（41〜）が開けば、その下に隠れる。 */
+   上に空きがあるぶんは全部あけて、下タブのすぐ上に置く（margin-top:auto）。
+   絵が縦に長くて入りきらないときは、絵といっしょに上へ転がっていく。 */
 .speech{
-  position:fixed;z-index:25;left:0;right:0;margin:0 auto;
-  bottom:calc(env(safe-area-inset-bottom) + 88px);
-  width:calc(100% - 32px);max-width:448px;          /* 本体の幅から左右の余白ぶんを引く */
+  margin-top:auto;
   background:var(--bg2);border:1px solid var(--line);
   padding:13px 15px;box-shadow:var(--shadow);
   font-size:14px;line-height:1.75;overflow-wrap:anywhere;
@@ -371,8 +367,9 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .toggle:disabled{opacity:.45}
 
 /* ---- bottom nav ---- */
+/* 下タブは箱のいちばん下の段。画面には貼りつけていない（body の説明を見よ）。 */
 .nav{
-  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  flex:none;
   background:var(--bg);
   background:color-mix(in srgb,var(--bg) 90%,transparent);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
