@@ -47,6 +47,14 @@ body{
   touch-action:manipulation;
   overscroll-behavior-y:none;
 }
+/* 指で触る端末では、長押ししたときに出る端末の「コピー／調べる／翻訳」を止める。
+   これが出ると、押した先ではなく近くの文字（日の小窓の中など）が選ばれてしまう。
+   書きこむところだけは今までどおり選べる。マウスのある環境（PC）には何もしない。 */
+@media (hover:none){
+  body{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  input,textarea{-webkit-touch-callout:default;-webkit-user-select:text;user-select:text}
+}
+
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:6px}
