@@ -1142,7 +1142,8 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   closePop();
-  $("main").scrollTop = 0;                              // 転がるのは main の中なので、戻すのもここ
+  $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
+  $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") { $("#backup").value = JSON.stringify(st); paintNotify(); }
 }));

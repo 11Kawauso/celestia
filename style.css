@@ -7,6 +7,8 @@
   --sun:#b8534f; --sat:#1f52c9; --aqua:#1d8ab0;
   --shadow:0 1px 2px rgba(18,23,52,.06),0 8px 24px rgba(18,23,52,.08);
   --r:14px;
+  /* セリフ枠の最低の高さ（3行ぶん＋上下の余白）。絵の下にあける場所もこれに合わせる。 */
+  --speech-h:117px;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -144,6 +146,10 @@ button{background:none;border:none;cursor:pointer}
    iPhone のようにバーが重ねて出る環境では何も起きない。 */
 main{
   flex:1;min-height:0;display:flex;flex-direction:column;
+  position:relative;overflow:hidden;          /* ここは動かない。中の .scroller だけが転がる */
+}
+.scroller{
+  flex:1;min-height:0;display:flex;flex-direction:column;
   overflow-y:auto;overscroll-behavior:contain;
   scrollbar-gutter:stable both-edges;
   padding:16px;
@@ -156,19 +162,28 @@ main{
    セリフは下タブのすぐ上に貼り付けるので、ここに残るのは絵だけ。
    あいだが空くのは、そこを埋める絵が入るまでの姿
    （絵を大きくしたいときは .portrait の max-height を上げる）。 */
-#v-home{position:relative}
+#v-home{padding-bottom:calc(var(--speech-h) + 12px)}   /* セリフの場所をあけておく */
 .stage{display:flex;flex-direction:column;gap:12px;flex:1}
 
-/* ゲージの入れ物。高さゼロの帯を main の上端に貼り付けてあるので、
-   中身を転がしてもゲージは右上から動かない。
-   top:0 は「main の内側の上端」を指す。貼りつく前と同じ場所なので、動き出しでずれない。
-   下の -18px は、この帯と絵のあいだにできる .view のすきまを打ち消すぶん。 */
-.halodock{position:sticky;top:0;height:0;margin-bottom:-18px;z-index:2}
+/* ホームのときだけ出るもの。ほかのタブでは、それぞれの display に戻さずここでしまう。 */
+main:not(.on-home) .homeonly{display:none}
+
+/* 転がらない層。.scroller の上にぴったり重ね、余白もスクロールバーの場所取りもそろえて
+   あるので、中の左右は転がる側の中身（絵やカード）と1pxもずれない。
+   何も無いところは後ろを触れるように、当たり判定は中の要素だけにする。 */
+.overlay{
+  position:absolute;inset:0;padding:16px;
+  overflow:hidden;scrollbar-gutter:stable both-edges;
+  display:flex;flex-direction:column;
+  pointer-events:none;
+}
+.overlay > *{pointer-events:auto}
 
 /* 右上の小さいゲージ。輪の形は大きいほうと同じで、まんなかに今のレベルの数字。
-   棘が輪の外に出るので、はみ出しは切らない。 */
+   棘が輪の外に出るので、はみ出しは切らない。
+   置き場所は転がらない層のほう。角から10pxだけ離す。 */
 .minihalo{
-  position:absolute;top:10px;right:10px;z-index:2;   /* 棘が外に出るぶん、角から少し離す */
+  align-self:flex-end;margin:10px 10px 0 0;
   width:48px;height:48px;flex:none;display:grid;place-items:center;
   filter:drop-shadow(0 2px 6px rgba(10,8,20,.45));
 }
@@ -192,19 +207,16 @@ main{
 /* 絵が入るまでの仮置き */
 .portrait .rune{font-family:"Shippori Mincho B1",serif;font-size:60px;color:var(--ink3);opacity:.45}
 /* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。
-   上に空きがあるぶんは全部あけて、下タブのすぐ上に置く（margin-top:auto）。
-   そこへ貼り付けてあるので、絵が縦に長くて転がるときも、ここから動かず絵だけが後ろを流れる。
-   bottom:0 は「main の内側の下端」を指す。貼りつく前と同じ場所なので、動き出しでずれない。
-   重なりは絵（0〜2）より上・下タブより下。 */
+   ゲージと同じく転がらない層に置いてあるので、後ろの絵だけが流れる。
+   上に空いているぶんは全部あけて、層のいちばん下に置く。 */
 .speech{
-  position:sticky;bottom:0;z-index:3;
   margin-top:auto;
   background:var(--bg2);border:1px solid var(--line);
   padding:17px 18px;box-shadow:var(--shadow);
   font-size:15px;line-height:1.8;overflow-wrap:anywhere;
   /* 短いひと言でも枠がやせないように、3行ぶんの高さは必ず取る。
      枠の高さが場面ごとに変わらないので、下タブとの間隔も動かない。 */
-  min-height:calc(5.4em + 36px);
+  min-height:var(--speech-h);
   display:flex;align-items:center;
 }
 
