@@ -70,6 +70,19 @@
 
     </section>
 
+    <!-- MEMO -->
+    <section class="view" id="v-memo">
+      <div class="sec">
+        <div class="sechead">
+          <!-- いまどのフォルダにいるか。いちばん上では「メモ」 -->
+          <div class="sectitle" id="memoWhere">メモ</div>
+          <button class="addbtn" id="memoAdd">＋ 追加</button>
+        </div>
+        <button class="btn memoback" id="memoBack" hidden>← ひとつ上へ</button>
+        <div id="memoList"></div>
+      </div>
+    </section>
+
     <!-- SETTINGS -->
     <section class="view" id="v-set">
       <div class="card">
@@ -154,6 +167,7 @@
     <button class="tab on" data-v="home"><svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg>ホーム</button>
     <button class="tab" data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>カレンダー</button>
     <button class="tab" data-v="goal"><svg viewBox="0 0 24 24"><path d="M6 21V4.5"/><path d="M6 4.5h11.5l-2.6 4 2.6 4H6"/></svg>目標</button>
+    <button class="tab" data-v="memo"><svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>メモ</button>
     <button class="tab" data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"/></svg>設定</button>
   </div>
 </nav>
@@ -363,6 +377,48 @@
       <button class="btn pri" id="gSave">保存する</button>
     </div>
     <button class="btn danger" id="gDelete" hidden>この目標を消す</button>
+  </div>
+</div>
+
+<!-- メモ：何を足すか -->
+<div class="sheet" id="sheetMAdd">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle">追加する</div>
+    <div class="btnrow" style="flex-direction:column">
+      <button class="btn" data-add="folder">フォルダ</button>
+      <button class="btn" data-add="note">メモ</button>
+    </div>
+    <div class="note">画像とファイルは、これから足します。</div>
+  </div>
+</div>
+
+<!-- メモ：中身の編集（フォルダは名前だけ） -->
+<div class="sheet" id="sheetMEdit">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="mmHead">メモ</div>
+    <input class="field" id="mmName" placeholder="名前">
+    <div id="mmBodyWrap">
+      <div class="lab" style="margin-bottom:6px">本文</div>
+      <textarea class="field" id="mmBody" placeholder="書きたいことを"></textarea>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="mmCancel">やめる</button>
+      <button class="btn pri" id="mmSave">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- メモ：長押しで出す設定 -->
+<div class="sheet" id="sheetMItem">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="miHead">設定</div>
+    <div class="btnrow" style="flex-direction:column">
+      <button class="btn" id="miRename">名前を変更</button>
+      <button class="btn danger" id="miDelete">削除</button>
+    </div>
   </div>
 </div>
 

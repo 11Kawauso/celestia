@@ -24,7 +24,7 @@ function seed() {
     missions: [
       wakeMission(uid(), WAKE_DEFAULT)
     ],
-    goals: [],
+    goals: [], memo: [],
     events: {}, log: {}, theme: "auto", notify: false
   };
 }
@@ -106,6 +106,22 @@ function normalize(o) {
       })
     };
   });
+
+  /* メモ。フォルダも中身も同じ1本の配列で持ち、parent でぶら下がりを表す。
+     こうしておくと、あとで移動や入れ子を足すときに形を変えずに済む。 */
+  o.memo = asArr(o.memo).map(x => {
+    const m = asObj(x);
+    return {
+      id: asStr(m.id) || uid(),
+      kind: m.kind === "folder" ? "folder" : "note",
+      name: asStr(m.name).slice(0, 120),
+      body: asStr(m.body),
+      parent: asStr(m.parent),
+      at: asDate(m.at)
+    };
+  });
+  // 親が消えているものは、いちばん上に戻す（迷子を作らない）
+  o.memo.forEach(m => { if (m.parent && !o.memo.some(x => x.kind === "folder" && x.id === m.parent)) m.parent = ""; });
 
   const ev = asObj(o.events); o.events = {};
   Object.keys(ev).forEach(k => {
@@ -486,6 +502,7 @@ function updateSpeech(now) {
 /* ---------- render ---------- */
 function render() {
   const now = new Date(), tk = keyOf(now);
+  renderMemo();
   $("#topdate").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日（" + DOW[now.getDay()] + "）";
 
   // hero
@@ -661,6 +678,137 @@ function renderCal() {
   for (let i = first.getDay() + last.getDate(); i < 42; i++) html += '<div class="cell pad"></div>';
   $("#calGrid").innerHTML = html;
 }
+
+/* ---------- メモ ---------- */
+/* フォルダとメモを、ひとつの配列に parent でぶら下げて持つ。
+   いま開いているフォルダは memoAt（空文字＝いちばん上）。 */
+let memoAt = "", mEditing = null, mEditKind = "note", mMenuFor = null, mDelArm = false;
+const ICO_FOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/></svg>';
+const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
+const memoOf = id => st.memo.find(x => x.id === id);
+const memoIn = pid => st.memo.filter(x => x.parent === pid);
+
+function renderMemo() {
+  const here = memoAt ? memoOf(memoAt) : null;
+  if (memoAt && !here) memoAt = "";                    // 開いていたフォルダが消えていたら上へ戻す
+  $("#memoWhere").textContent = here ? here.name || "名前のないフォルダ" : "メモ";
+  $("#memoBack").hidden = !memoAt;
+
+  // フォルダが先、それぞれ新しいものが上
+  const list = memoIn(memoAt);
+  const sorted = list.filter(x => x.kind === "folder").concat(list.filter(x => x.kind !== "folder"))
+    .sort((a, b) => (a.kind === "folder" ? 0 : 1) - (b.kind === "folder" ? 0 : 1) ||
+      (b.at || "").localeCompare(a.at || ""));
+
+  $("#memoList").innerHTML = sorted.length ? sorted.map(m => {
+    const sub = m.kind === "folder"
+      ? memoIn(m.id).length + "件"
+      : (m.body ? esc(m.body) : "");
+    return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' +
+      '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' +
+        (m.kind === "folder" ? ICO_FOLDER : ICO_NOTE) + "</span>" +
+      '<div class="rowbody"><div class="rowtitle">' +
+        esc(m.name || (m.kind === "folder" ? "名前のないフォルダ" : "名前のないメモ")) + "</div>" +
+      (sub ? '<div class="mbody">' + sub + "</div>" : "") + "</div></div>";
+  }).join("") : '<div class="empty">まだ何もありません。<br>右上の「＋ 追加」から、フォルダかメモを作れます。</div>';
+  $("#memoList").style.display = "flex";
+  $("#memoList").style.flexDirection = "column";
+  $("#memoList").style.gap = "10px";
+}
+
+/* 編集の窓を開く。folder のときは本文の欄を出さない。 */
+function openMemoEdit(kind, id) {
+  mEditKind = kind; mEditing = id || null;
+  const m = id ? memoOf(id) : null;
+  $("#mmHead").textContent = (kind === "folder" ? "フォルダ" : "メモ") + (m ? "" : "を作る");
+  $("#mmName").value = m ? m.name : "";
+  $("#mmBody").value = m && m.kind !== "folder" ? m.body : "";
+  $("#mmBodyWrap").hidden = kind === "folder";
+  openSheet("#sheetMEdit");
+  if (!m) setTimeout(() => $("#mmName").focus(), 60);
+}
+$("#memoAdd").addEventListener("click", () => openSheet("#sheetMAdd"));
+$("#sheetMAdd").addEventListener("click", e => {
+  const b = e.target.closest("[data-add]"); if (!b) return;
+  closeSheet("#sheetMAdd");
+  openMemoEdit(b.dataset.add, null);
+});
+$("#memoBack").addEventListener("click", () => {
+  const here = memoOf(memoAt);
+  memoAt = here ? here.parent : "";
+  renderMemo();
+});
+$("#mmCancel").addEventListener("click", () => closeSheet("#sheetMEdit"));
+$("#mmSave").addEventListener("click", () => {
+  const name = $("#mmName").value.trim();
+  const body = mEditKind === "folder" ? "" : $("#mmBody").value;
+  if (!name && !body) return;                          // どちらも空なら何もしない
+  const target = mEditing && memoOf(mEditing);
+  if (target) { target.name = name; if (target.kind !== "folder") target.body = body; }
+  else st.memo.push({ id: uid(), kind: mEditKind, name: name, body: body,
+                      parent: memoAt, at: keyOf(new Date()) });
+  save(); renderMemo(); closeSheet("#sheetMEdit");
+});
+
+/* 一覧を押したとき。フォルダなら中へ、メモなら編集の窓へ。 */
+$("#memoList").addEventListener("click", e => {
+  const b = e.target.closest("[data-act='mopen']"); if (!b) return;
+  if (Date.now() - mHoldEnd < HOLD_EAT) return;        // 長押し直後の一押しは飲みこむ
+  const m = memoOf(b.dataset.id); if (!m) return;
+  if (m.kind === "folder") { memoAt = m.id; renderMemo(); }
+  else openMemoEdit("note", m.id);
+});
+
+/* 長押しで設定の窓。指がずれたら、なぞりとみなして取り消す。 */
+let mHoldT = null, mHoldFrom = null, mHoldEnd = 0;
+function mStopHold() { clearTimeout(mHoldT); mHoldT = null; mHoldFrom = null; }
+$("#memoList").addEventListener("pointerdown", e => {
+  const b = e.target.closest("[data-act='mopen']"); if (!b) return;
+  mHoldFrom = { x: e.clientX, y: e.clientY };
+  clearTimeout(mHoldT);
+  mHoldT = setTimeout(() => {
+    mHoldT = null; mHoldEnd = Date.now();
+    openMemoMenu(b.dataset.id);
+  }, HOLD_MS);
+});
+$("#memoList").addEventListener("pointermove", e => {
+  if (!mHoldT || !mHoldFrom) return;
+  if (Math.abs(e.clientX - mHoldFrom.x) > HOLD_SLOP ||
+      Math.abs(e.clientY - mHoldFrom.y) > HOLD_SLOP) mStopHold();
+});
+["pointerup", "pointercancel"].forEach(t => $("#memoList").addEventListener(t, mStopHold));
+
+function openMemoMenu(id) {
+  const m = memoOf(id); if (!m) return;
+  mMenuFor = id; mDelArm = false;
+  $("#miHead").textContent = m.name || (m.kind === "folder" ? "名前のないフォルダ" : "名前のないメモ");
+  $("#miDelete").textContent = "削除";
+  openSheet("#sheetMItem");
+}
+$("#miRename").addEventListener("click", () => {
+  const m = memoOf(mMenuFor); if (!m) return;
+  closeSheet("#sheetMItem");
+  openMemoEdit(m.kind, m.id);
+});
+/* 消すのは二度押し。一度目は聞き返すだけ（アプリのほかの場所と同じやり方）。 */
+$("#miDelete").addEventListener("click", e => {
+  const m = memoOf(mMenuFor); if (!m) return;
+  // フォルダを消すときは、中身も一緒に消える
+  const gone = [m.id];
+  for (let i = 0; i < gone.length; i++)
+    st.memo.filter(x => x.parent === gone[i]).forEach(x => gone.push(x.id));
+  const n = gone.length - 1;
+  if (!mDelArm) {
+    mDelArm = true;
+    e.target.textContent = (m.kind === "folder" && n ? "中の" + n + "件も消える。" : "") + "もう一度おす";
+    setTimeout(() => { if (mDelArm) { mDelArm = false; e.target.textContent = "削除"; } }, 3500);
+    return;
+  }
+  st.memo = st.memo.filter(x => !gone.includes(x.id));
+  if (gone.includes(memoAt)) memoAt = "";
+  mDelArm = false; e.target.textContent = "削除";
+  save(); renderMemo(); closeSheet("#sheetMItem");
+});
 
 /* ---------- sheets ---------- */
 function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); }

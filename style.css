@@ -457,13 +457,23 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   border-top:1px solid var(--line);
   padding:6px 0 calc(env(safe-area-inset-bottom) + 6px);
 }
-.navin{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.navin{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
 .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--ink3);font-size:10px;letter-spacing:.04em}
 .tab svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--dawn)}
 
 #mFree{display:flex;flex-direction:column;gap:13px}
 .pill .pexp{margin-left:6px;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
+
+/* ---- メモ ---- */
+/* 一覧は予定や目標と同じ .row を使う。頭のしるしだけメモ用に足す。 */
+.memoback{align-self:flex-start;padding:6px 12px;font-size:12.5px;color:var(--ink2)}
+.mico{flex:none;width:22px;height:22px;display:grid;place-items:center;color:var(--ink3)}
+.mico svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mico.folder{color:var(--dawn)}
+.mbody{font-size:12.5px;color:var(--ink3);margin-top:3px;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+#mmBody{min-height:160px;line-height:1.7;resize:vertical}
 
 /* ---- sheet ---- */
 .scrim{position:fixed;inset:0;z-index:40;background:rgba(10,8,20,.5);opacity:0;pointer-events:none;transition:opacity .22s}
