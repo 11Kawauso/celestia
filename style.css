@@ -289,6 +289,7 @@ main:not(.on-home) .homeonly{display:none}
 .row.done{background:color-mix(in srgb,var(--ok) 9%,var(--bg2));border-color:color-mix(in srgb,var(--ok) 26%,var(--line))}
 .row.clear{border-color:var(--ok)}
 .row.locked{opacity:.55}
+.row.imp{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--bg2))}
 .row.editing{border-color:var(--dawn)}   /* いま下の欄で直している予定 */
 
 /* 報酬の受け取りボタン。
@@ -317,6 +318,7 @@ main:not(.on-home) .homeonly{display:none}
 .chip{font-size:10.5px;color:var(--ink3);background:var(--bg3);padding:2px 7px;border-radius:99px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .chip.time{color:var(--dawn);background:color-mix(in srgb,var(--dawn) 13%,transparent)}
 .chip.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
+.chip.imp{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent);font-weight:700}
 .chip.fire{color:var(--dusk);background:color-mix(in srgb,var(--dusk) 13%,transparent)}
 .chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
 .expbadge{font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums;flex:none;letter-spacing:0;white-space:nowrap}
@@ -334,7 +336,9 @@ main:not(.on-home) .homeonly{display:none}
 .dow{text-align:center;font-size:12.5px;color:var(--ink3);padding:5px 0;letter-spacing:.05em}
 .dow.sun{color:var(--sun)} .dow.sat{color:var(--sat)}
 .cell{
-  aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
+  /* 縦は点3色ぶんの場所を見こんである（日付＋点3行＋いちばん下の進みバー）。
+     カレンダーの下にはまだ余白があるので、伸ばしても下タブには当たらない。 */
+  aspect-ratio:1/1.42;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
   transition:border-color .16s ease;        /* 長押しの金色の枠も、小窓と同じ速さで */
   touch-action:pan-y;                       /* 横になぞっても画面が流れないように（日を渡り歩くため） */
@@ -344,13 +348,19 @@ main:not(.on-home) .homeonly{display:none}
 .cell.held{border-color:var(--dawn)}   /* 長押しで小窓を出しているあいだの目印 */
 .cell.pad{background:transparent;border-color:transparent}
 .cell.now{border-color:var(--dawn);box-shadow:0 0 0 1px var(--dawn) inset}
-.cell .d{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.cell .d{font-size:15px;line-height:1.25;font-variant-numeric:tabular-nums;color:var(--ink2)}
 .cell .d.sun{color:var(--sun)}
 .cell .d.sat{color:var(--sat)}
 .cell.now .d{color:var(--dawn);font-weight:700}
-.cell .dots{display:flex;gap:3px;align-items:center;height:4px}
-.cell .dot{width:4px;height:4px;border-radius:50%;background:var(--night)}
-.cell .dot.due{background:var(--dawn)}
+/* 点は色ごとに1行、縦に積む。2つ以上あるときだけ横に数を出す。
+   青＝ふつうの予定、赤＝重要な予定、金＝長期目標の期限。 */
+.cell .dots{display:flex;flex-direction:column;gap:2px;align-items:center}
+.dotrow{display:flex;align-items:center;gap:3px;height:9px}
+.dot{width:5px;height:5px;border-radius:50%;flex:none}
+.dot.ev{background:var(--night)}
+.dot.imp{background:var(--bad)}
+.dot.due{background:var(--dawn)}
+.dotnum{font-size:9px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink3)}
 .cell .mini{position:absolute;left:5px;right:5px;bottom:5px;height:3px;border-radius:99px;background:var(--bg3);overflow:hidden}
 .cell .mini i{display:block;height:100%;background:linear-gradient(90deg,var(--dusk),var(--dawn))}
 
@@ -360,6 +370,12 @@ main:not(.on-home) .homeonly{display:none}
 .dpholi{font-size:12.5px;color:var(--sun)}
 .dplist{list-style:none;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
 .dplist li{display:flex;gap:7px;align-items:baseline}
+.dplist li.imp{position:relative;padding-left:11px}
+.dplist li.imp::before{
+  content:"";position:absolute;left:0;top:.45em;
+  width:5px;height:5px;border-radius:50%;background:var(--bad);
+}
+.dplist li.imp .dpname{color:var(--bad)}
 .dptime{color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .dpname{overflow-wrap:anywhere}
 .dpnone{font-size:12.5px;color:var(--ink3)}
@@ -494,6 +510,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{border:1px solid var(--line);background:var(--bg2);border-radius:99px;padding:6px 13px;font-size:13px;color:var(--ink2)}
 .pill.on{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}
+.pill.imp.on{background:var(--bad)}   /* 「重要」だけは赤。予定の枠と同じ色 */
 .days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .day{border:1px solid var(--line);background:var(--bg2);border-radius:9px;padding:7px 0;font-size:12.5px;text-align:center;color:var(--ink2)}
 .day.on{background:linear-gradient(135deg,var(--dusk),var(--dawn));border-color:transparent;color:#fff;font-weight:700}

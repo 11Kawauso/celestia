@@ -112,7 +112,8 @@ function normalize(o) {
     const list = asArr(ev[k]).map(y => {
       const e = asObj(y);
       return { id: asStr(e.id) || uid(), title: asStr(e.title),
-               time: asTime(e.time), end: asTime(e.end), notify: asStamp(e.notify) };
+               time: asTime(e.time), end: asTime(e.end), notify: asStamp(e.notify),
+               important: !!e.important };   // 無ければ「ふつうの予定」になるので、古い控えもそのまま読める
     });
     if (list.length) o.events[k] = list;
   });
@@ -638,16 +639,21 @@ function renderCal() {
     const sched = st.missions.filter(m => m.days.includes(d.getDay()));
     const doneN = sched.filter(m => doneOn(m.id, k)).length;
     const ratio = sched.length ? doneN / sched.length : 0;
-    const hasEv = (st.events[k] || []).length > 0;
-    const hasGoal = st.goals.some(g => !g.done && g.due === k);
+    // 点は色ごとに1行。青＝ふつうの予定、赤＝重要な予定、金＝長期目標の期限。
+    // 2つ以上あるときだけ、点の横に数を出す。
+    const evs = st.events[k] || [];
+    const impN = evs.filter(e => e.important).length;
+    const evN = evs.length - impN;
+    const goalN = st.goals.filter(g => !g.done && g.due === k).length;
+    const dotRow = (cls, n) => n ? '<span class="dotrow"><i class="dot ' + cls + '"></i>' +
+      (n > 1 ? '<b class="dotnum">' + n + "</b>" : "") + "</span>" : "";
+    const dots = dotRow("ev", evN) + dotRow("imp", impN) + dotRow("due", goalN);
     // 日曜と祝日は赤、土曜は青。今日はこの上から金色になる。
     const dw = d.getDay();
     const dc = (dw === 0 || holidayName(d)) ? " sun" : dw === 6 ? " sat" : "";
     html += '<button class="cell' + (k === tk ? " now" : "") + '" data-act="day" data-k="' + k + '">' +
       '<span class="d' + dc + '">' + day + "</span>" +
-      (hasEv || hasGoal ? '<span class="dots">' +
-        (hasEv ? '<span class="dot"></span>' : "") +
-        (hasGoal ? '<span class="dot due"></span>' : "") + "</span>" : "") +
+      (dots ? '<span class="dots">' + dots + "</span>" : "") +
       (doneN ? '<span class="mini"><i style="width:' + Math.round(ratio * 100) + '%"></i></span>' : "") +
       "</button>";
   }
@@ -800,15 +806,24 @@ function clearDayForm() {
   dEditing = null;
   $("#dEvName").value = ""; $("#dEvTime").value = ""; $("#dEvEnd").value = "";
   $("#dNotifyDate").value = ""; $("#dNotifyTime").value = "";
+  markImp(false);
   $("#dEvAdd").textContent = "予定を追加";
   $("#dEvCancel").hidden = true;
 }
+/* 「重要」の入り切り。押した見た目と、読み上げ用の印を一緒に切りかえる。 */
+function markImp(on) {
+  $("#dEvImp").classList.toggle("on", on);
+  $("#dEvImp").setAttribute("aria-pressed", on ? "true" : "false");
+}
+$("#dEvImp").addEventListener("click", () => markImp(!$("#dEvImp").classList.contains("on")));
+
 /* その予定を入力欄に写して、編集のモードにする */
 function editEvent(id) {
   const e = (st.events[dayKey] || []).find(x => x.id === id); if (!e) return;
   dEditing = id;
   $("#dEvName").value = e.title;
   $("#dEvTime").value = e.time; $("#dEvEnd").value = e.end;
+  markImp(!!e.important);
   $("#dNotifyDate").value = e.notify ? e.notify.slice(0, 10) : "";
   $("#dNotifyTime").value = e.notify ? e.notify.slice(11) : "";
   $("#dEvAdd").textContent = "保存する";
@@ -825,10 +840,11 @@ function paintDay() {
 
   const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
-    '<div class="row' + (e.id === dEditing ? " editing" : "") + '">' +
+    '<div class="row' + (e.important ? " imp" : "") + (e.id === dEditing ? " editing" : "") + '">' +
     '<button class="edit" data-act="evedit" data-id="' + esc(e.id) + '" aria-label="この予定を編集"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>' +
     '<div class="rowbody"><div class="rowtitle">' + esc(e.title) + "</div>" +
-    (evSpan(e) || e.notify ? '<div class="chips">' +
+    (e.important || evSpan(e) || e.notify ? '<div class="chips">' +
+      (e.important ? '<span class="chip imp">重要</span>' : "") +
       (evSpan(e) ? '<span class="chip time">' + esc(evSpan(e)) + "</span>" : "") +
       (e.notify ? '<span class="chip">通知 ' + esc(stampText(e.notify)) + "</span>" : "") +
       "</div>" : "") + "</div>" +
@@ -849,7 +865,10 @@ $("#dEvAdd").addEventListener("click", () => {
   // 日が空なら予定の日、時刻が空なら昼12時。どちらも空なら「決めていない」。
   const nd = $("#dNotifyDate").value, nt = $("#dNotifyTime").value;
   const notify = canNotify() && (nd || nt) ? (nd || dayKey) + "T" + (nt || "12:00") : "";
-  const data = { title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value, notify: notify };
+  const data = {
+    title: t, time: $("#dEvTime").value, end: $("#dEvEnd").value, notify: notify,
+    important: $("#dEvImp").classList.contains("on")
+  };
   const list = st.events[dayKey] || (st.events[dayKey] = []);
   const target = dEditing && list.find(x => x.id === dEditing);
   if (target) Object.assign(target, data);            // 編集中なら上書き
@@ -1048,7 +1067,7 @@ function dayPopHtml(k) {
     '<div class="dpdate">' + y + "年" + m + "月" + dd + "日（" + DOW[d.getDay()] + "）</div>" +
     (holi ? '<div class="dpholi">' + esc(holi) + "</div>" : "") +
     (ev.length
-      ? '<ul class="dplist">' + ev.map(e => "<li>" +
+      ? '<ul class="dplist">' + ev.map(e => '<li' + (e.important ? ' class="imp"' : "") + ">" +
           (evSpan(e) ? '<span class="dptime">' + esc(evSpan(e)) + "</span>" : "") +
           '<span class="dpname">' + esc(e.title) + "</span></li>").join("") + "</ul>"
       : '<div class="dpnone">予定なし</div>') +
