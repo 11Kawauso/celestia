@@ -1056,16 +1056,23 @@ function dayPopHtml(k) {
 }
 function stopHold() { clearTimeout(holdTimer); holdTimer = null; holdFrom = null; }
 function dayCellOf(e) { return e.target.closest(".cell[data-act='day']"); }
-/* 指の下にある日。触ったあとの pointermove は最初に押した日にしか届かない
+/* 指の下を見る。触ったあとの pointermove は最初に押した日にしか届かない
    （端末が指をその要素に結びつけるため）ので、座標から引き直す。
-   小窓が指の上に重なっていても、下に隠れている日まで見にいく。 */
-function cellAt(x, y) {
-  const list = document.elementsFromPoint(x, y);
-  for (const el of list) {
-    const c = el.closest && el.closest(".cell[data-act='day']");
-    if (c) return c;
+   小窓が指の上に重なっていても、下に隠れている日まで見にいく。
+   返すのは3通り。
+     {cell}  … 日の上にいる
+     {}      … マスとマスのすきま。ここで消すと、なぞるあいだ点滅するので何もしない
+     {off:1} … 日から外れた（空きマスや、表の外）*/
+function underFinger(x, y) {
+  let gap = false;
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (!el.closest) continue;
+    const c = el.closest(".cell[data-act='day']");
+    if (c) return { cell: c };
+    if (el.classList.contains("pad")) return { off: 1 };   // 月の頭とお尻の空きマス
+    if (el.id === "calGrid") gap = true;
   }
-  return null;
+  return gap ? {} : { off: 1 };
 }
 function openDayPop(cell) {
   holdKey = cell.dataset.k;
@@ -1091,8 +1098,12 @@ calGrid.addEventListener("pointerdown", e => {
 });
 calGrid.addEventListener("pointermove", e => {
   if (holding) {                                // 出したあとは、指の下の日へ付け替える
-    const cell = cellAt(e.clientX, e.clientY);
-    if (cell && cell.dataset.k !== holdKey) openDayPop(cell);
+    const hit = underFinger(e.clientX, e.clientY);
+    if (hit.cell) {
+      if (hit.cell.dataset.k !== holdKey) openDayPop(hit.cell);
+    } else if (hit.off && holdKey) {
+      holdKey = ""; closePop();                 // 日から外れたら消す。また乗れば出る
+    }
     return;
   }
   if (!holdTimer || !holdFrom) return;
