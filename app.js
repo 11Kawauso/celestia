@@ -1031,11 +1031,13 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); 
 
 /* ---------- 日を長押しして、その日の中身を見る ---------- */
 /* 指では長押し、マウスでは重ねるだけ。押した日の上に小窓が出る。
+   出たあとは、指を離さずになぞれば、指の下の日に小窓が付け替わる。離せば閉じる。
    開けるのは中身だけで、書きかえは今までどおり日をふつうに押して出す画面のほう。 */
 const HOLD_MS = 420;    // これだけ押しつづけたら小窓を出す
-const HOLD_SLOP = 10;   // 指がこれだけずれたら、なぞりとみなして取り消す
+const HOLD_SLOP = 10;   // 小窓が出る前に指がこれだけずれたら、なぞりとみなして取り消す
 const HOVER_MS = 200;   // マウスを重ねてから出るまで
-let holdTimer = null, holdFrom = null, holdDone = false;
+const HOLD_EAT = 400;   // 長押しを終えてから、この間に来た一押しは飲みこむ
+let holdTimer = null, holdFrom = null, holding = false, holdKey = "", holdEndAt = 0;
 
 function dayPopHtml(k) {
   const [y, m, dd] = k.split("-").map(Number);
@@ -1054,6 +1056,28 @@ function dayPopHtml(k) {
 }
 function stopHold() { clearTimeout(holdTimer); holdTimer = null; holdFrom = null; }
 function dayCellOf(e) { return e.target.closest(".cell[data-act='day']"); }
+/* 指の下にある日。触ったあとの pointermove は最初に押した日にしか届かない
+   （端末が指をその要素に結びつけるため）ので、座標から引き直す。
+   小窓が指の上に重なっていても、下に隠れている日まで見にいく。 */
+function cellAt(x, y) {
+  const list = document.elementsFromPoint(x, y);
+  for (const el of list) {
+    const c = el.closest && el.closest(".cell[data-act='day']");
+    if (c) return c;
+  }
+  return null;
+}
+function openDayPop(cell) {
+  holdKey = cell.dataset.k;
+  showPop(cell, dayPopHtml(holdKey), false);
+}
+function endHold() {
+  stopHold();
+  if (!holding) return;
+  holding = false; holdKey = "";
+  holdEndAt = Date.now();                       // 直後の一押しを飲みこむための目印
+  closePop();                                   // なぞり終わりに最後の日が残らないように
+}
 
 const calGrid = $("#calGrid");
 calGrid.addEventListener("pointerdown", e => {
@@ -1061,21 +1085,28 @@ calGrid.addEventListener("pointerdown", e => {
   holdFrom = { x: e.clientX, y: e.clientY };
   clearTimeout(holdTimer);
   holdTimer = setTimeout(() => {
-    holdTimer = null; holdDone = true;          // このあとに来る click は飲みこむ
-    showPop(cell, dayPopHtml(cell.dataset.k), true);
+    holdTimer = null; holding = true;
+    openDayPop(cell);
   }, HOLD_MS);
 });
 calGrid.addEventListener("pointermove", e => {
+  if (holding) {                                // 出したあとは、指の下の日へ付け替える
+    const cell = cellAt(e.clientX, e.clientY);
+    if (cell && cell.dataset.k !== holdKey) openDayPop(cell);
+    return;
+  }
   if (!holdTimer || !holdFrom) return;
   if (Math.abs(e.clientX - holdFrom.x) > HOLD_SLOP ||
       Math.abs(e.clientY - holdFrom.y) > HOLD_SLOP) stopHold();
 });
-["pointerup", "pointercancel"].forEach(t => calGrid.addEventListener(t, stopHold));
+["pointerup", "pointercancel"].forEach(t => calGrid.addEventListener(t, endHold));
 /* 長押しで小窓を出したときは、指を離したときの一押しをここで止める。
-   止めないと、そのまま日の画面まで開いてしまう。 */
+   止めないと、そのまま日の画面まで開いてしまう。
+   指が別の日へ動いていると一押し自体が来ないこともあるので、
+   目印は「立てっぱなしの旗」ではなく時刻にしてある（放っておいても消える）。 */
 calGrid.addEventListener("click", e => {
-  if (!holdDone) return;
-  holdDone = false;
+  if (Date.now() - holdEndAt > HOLD_EAT) return;
+  holdEndAt = 0;
   e.stopPropagation(); e.preventDefault();
 }, true);
 

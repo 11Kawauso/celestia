@@ -122,7 +122,14 @@ button{background:none;border:none;cursor:pointer}
   transition:opacity .16s ease, transform .16s cubic-bezier(.2,.9,.3,1);
 }
 .pop.below{transform-origin:50% 0}
-.pop.on{opacity:1;transform:scale(1);pointer-events:auto}
+.pop.on{
+  opacity:1;transform:scale(1);pointer-events:auto;
+  /* 出たあとに日から日へ動くときだけ、位置もすべらせる。
+     出る瞬間は .on がまだ無いので、前の場所から飛んでくることはない。 */
+  transition:opacity .16s ease, transform .16s cubic-bezier(.2,.9,.3,1),
+             left .12s ease, top .12s ease;
+}
+.pop.on .poparrow{transition:left .12s ease}
 .popbody{max-height:56vh;overflow:auto;display:flex;flex-direction:column;gap:9px}
 .popbody .note{font-size:12.5px}
 .poparrow{
@@ -318,6 +325,7 @@ main{
   aspect-ratio:1/1.12;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
   transition:border-color .16s ease;        /* 長押しの金色の枠も、小窓と同じ速さで */
+  touch-action:pan-y;                       /* 横になぞっても画面が流れないように（日を渡り歩くため） */
   /* 長押しで小窓を出すので、そのとき端末側の「コピー」や文字選択が割りこまないようにする */
   -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
 }
