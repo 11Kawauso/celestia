@@ -388,8 +388,10 @@
     <div class="btnrow" style="flex-direction:column">
       <button class="btn" data-add="folder">フォルダ</button>
       <button class="btn" data-add="note">メモ</button>
+      <button class="btn" data-add="image">画像</button>
     </div>
-    <div class="note">画像とファイルは、これから足します。</div>
+    <!-- 画像をえらぶための入口。見えないところに置いてある -->
+    <input type="file" id="memoFile" accept="image/*" hidden>
   </div>
 </div>
 
@@ -410,6 +412,44 @@
   </div>
 </div>
 
+<!-- メモ：画像を見る -->
+<div class="sheet" id="sheetMView">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="mvHead">画像</div>
+    <div class="mview"><img id="mvImg" alt=""></div>
+    <button class="btn" id="mvClose">とじる</button>
+  </div>
+</div>
+
+<!-- メモ：閲覧制限をかける／はずす -->
+<div class="sheet" id="sheetMLock">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle">閲覧制限</div>
+    <input class="field" id="mlWord" type="password" placeholder="合言葉" autocomplete="off">
+    <div class="note">中身を出す前に、この合言葉を聞きます。<b>かくすだけ</b>の仕組みなので、バックアップの文字列には合言葉も中身もそのまま入ります。人に見せない、くらいの気持ちで使ってください。</div>
+    <div class="btnrow">
+      <button class="btn danger" id="mlOff">はずす</button>
+      <button class="btn pri" id="mlOn">かける</button>
+    </div>
+  </div>
+</div>
+
+<!-- メモ：鍵をあける -->
+<div class="sheet" id="sheetMOpen">
+  <div class="sheetin">
+    <div class="grab"></div>
+    <div class="sheettitle" id="moHead">合言葉</div>
+    <input class="field" id="moWord" type="password" placeholder="合言葉" autocomplete="off">
+    <div class="note" id="moNg" hidden>ちがいます。</div>
+    <div class="btnrow">
+      <button class="btn" id="moCancel">やめる</button>
+      <button class="btn pri" id="moOk">ひらく</button>
+    </div>
+  </div>
+</div>
+
 <!-- メモ：長押しで出す設定 -->
 <div class="sheet" id="sheetMItem">
   <div class="sheetin">
@@ -417,6 +457,7 @@
     <div class="sheettitle" id="miHead">設定</div>
     <div class="btnrow" style="flex-direction:column">
       <button class="btn" id="miRename">名前を変更</button>
+      <button class="btn" id="miLock">閲覧制限</button>
       <button class="btn danger" id="miDelete">削除</button>
     </div>
   </div>

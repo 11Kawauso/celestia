@@ -113,11 +113,12 @@ function normalize(o) {
     const m = asObj(x);
     return {
       id: asStr(m.id) || uid(),
-      kind: m.kind === "folder" ? "folder" : "note",
+      kind: ["folder", "note", "image"].includes(m.kind) ? m.kind : "note",
       name: asStr(m.name).slice(0, 120),
       body: asStr(m.body),
       parent: asStr(m.parent),
-      at: asDate(m.at)
+      at: asDate(m.at),
+      lock: asStr(m.lock).slice(0, 60)   // 合言葉。空なら制限なし（かくすだけの仕組み）
     };
   });
   // 親が消えているものは、いちばん上に戻す（迷子を作らない）
@@ -679,41 +680,120 @@ function renderCal() {
   $("#calGrid").innerHTML = html;
 }
 
+/* ---------- 画像の物置 ---------- */
+/* 画像の本体だけは IndexedDB に置く。JSONの保存場所（localStorage）は5MBほどしかなく、
+   写真1枚で使い切ってしまうため。メモ側は「どの画像か」の目印だけを持つ。
+   そのため、設定画面のバックアップ文字列に画像は入らない。 */
+const DB_NAME = "celestia-files", DB_STORE = "blobs";
+let dbP = null;
+function fileDB() {
+  if (!dbP) dbP = new Promise((ok, ng) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains(DB_STORE)) r.result.createObjectStore(DB_STORE);
+    };
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => ng(r.error);
+  });
+  return dbP;
+}
+function fileDo(mode, fn) {
+  return fileDB().then(d => new Promise((ok, ng) => {
+    const tx = d.transaction(DB_STORE, mode), req = fn(tx.objectStore(DB_STORE));
+    tx.oncomplete = () => ok(req ? req.result : undefined);
+    tx.onerror = () => ng(tx.error);
+  })).catch(() => null);
+}
+const fileGet = k => fileDo("readonly", s => s.get(k));
+const filePut = (k, v) => fileDo("readwrite", s => s.put(v, k));
+const fileDel = k => fileDo("readwrite", s => s.delete(k));
+
+/* 一覧に出すための小さい画像を焼く。元の写真は大きいので、
+   そのまま並べると読みこみも記憶も重くなる。 */
+function makeThumb(file, max) {
+  return new Promise(ok => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * s));
+      c.height = Math.max(1, Math.round(img.height * s));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => ok(b || file), "image/jpeg", 0.8);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ok(null); };
+    img.src = url;
+  });
+}
+
 /* ---------- メモ ---------- */
 /* フォルダとメモを、ひとつの配列に parent でぶら下げて持つ。
    いま開いているフォルダは memoAt（空文字＝いちばん上）。 */
 let memoAt = "", mEditing = null, mEditKind = "note", mMenuFor = null, mDelArm = false;
+let memoSig = "", thumbUrls = [];
+const opened = new Set();          // この起動のあいだ、合言葉を通したもの
 const ICO_FOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/></svg>';
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
+const ICO_LOCK = '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>';
 const memoOf = id => st.memo.find(x => x.id === id);
 const memoIn = pid => st.memo.filter(x => x.parent === pid);
+const memoName = m => m.name || ("名前のない" + (m.kind === "folder" ? "フォルダ" : m.kind === "image" ? "画像" : "メモ"));
+const isShut = m => !!m.lock && !opened.has(m.id);   // 鍵がかかっていて、まだ開けていない
 
 function renderMemo() {
   const here = memoAt ? memoOf(memoAt) : null;
   if (memoAt && !here) memoAt = "";                    // 開いていたフォルダが消えていたら上へ戻す
-  $("#memoWhere").textContent = here ? here.name || "名前のないフォルダ" : "メモ";
+  $("#memoWhere").textContent = here ? memoName(here) : "メモ";
   $("#memoBack").hidden = !memoAt;
 
   // フォルダが先、それぞれ新しいものが上
   const list = memoIn(memoAt);
-  const sorted = list.filter(x => x.kind === "folder").concat(list.filter(x => x.kind !== "folder"))
-    .sort((a, b) => (a.kind === "folder" ? 0 : 1) - (b.kind === "folder" ? 0 : 1) ||
-      (b.at || "").localeCompare(a.at || ""));
+  const sorted = list.slice().sort((a, b) =>
+    (a.kind === "folder" ? 0 : 1) - (b.kind === "folder" ? 0 : 1) ||
+    (b.at || "").localeCompare(a.at || ""));
+
+  // 中身が同じなら作り直さない。毎分の画面更新で画像を読み直さないため。
+  const sig = memoAt + "|" + sorted.map(m =>
+    [m.id, m.kind, m.name, m.body.slice(0, 40), m.lock ? 1 : 0, isShut(m) ? 1 : 0,
+     m.kind === "folder" ? memoIn(m.id).length : ""].join(",")).join(";");
+  if (sig === memoSig && $("#memoList").children.length) return;
+  memoSig = sig;
 
   $("#memoList").innerHTML = sorted.length ? sorted.map(m => {
-    const sub = m.kind === "folder"
-      ? memoIn(m.id).length + "件"
-      : (m.body ? esc(m.body) : "");
-    return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' +
-      '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' +
-        (m.kind === "folder" ? ICO_FOLDER : ICO_NOTE) + "</span>" +
-      '<div class="rowbody"><div class="rowtitle">' +
-        esc(m.name || (m.kind === "folder" ? "名前のないフォルダ" : "名前のないメモ")) + "</div>" +
-      (sub ? '<div class="mbody">' + sub + "</div>" : "") + "</div></div>";
-  }).join("") : '<div class="empty">まだ何もありません。<br>右上の「＋ 追加」から、フォルダかメモを作れます。</div>';
+    const shut = isShut(m);
+    const sub = shut ? '<div class="mlock">合言葉で見られます</div>'
+      : m.kind === "folder" ? '<div class="mbody">' + memoIn(m.id).length + "件</div>"
+      : m.kind === "note" && m.body ? '<div class="mbody">' + esc(m.body) + "</div>"
+      : "";
+    const head = m.kind === "image" && !shut
+      ? '<span class="mthumb" data-th="' + esc(m.id) + '"></span>'
+      : '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' +
+        (shut ? ICO_LOCK : m.kind === "folder" ? ICO_FOLDER : ICO_NOTE) + "</span>";
+    return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' + head +
+      '<div class="rowbody"><div class="rowtitle">' + esc(memoName(m)) + "</div>" + sub +
+      "</div></div>";
+  }).join("") : '<div class="empty">まだ何もありません。<br>右上の「＋ 追加」から作れます。</div>';
   $("#memoList").style.display = "flex";
   $("#memoList").style.flexDirection = "column";
   $("#memoList").style.gap = "10px";
+  paintThumbs();
+}
+
+/* 一覧の画像を、物置から出して貼る。前に作った参照は捨てておく。 */
+function paintThumbs() {
+  thumbUrls.forEach(u => URL.revokeObjectURL(u));
+  thumbUrls = [];
+  $$("#memoList [data-th]").forEach(el => {
+    fileGet("th-" + el.dataset.th)
+      .then(b => b || fileGet("img-" + el.dataset.th))   // 小さいのが無ければ元の画像で
+      .then(b => {
+        if (!b || !el.isConnected) return;
+        const u = URL.createObjectURL(b);
+        thumbUrls.push(u);
+        el.style.backgroundImage = "url(" + u + ")";
+      });
+  });
 }
 
 /* 編集の窓を開く。folder のときは本文の欄を出さない。 */
@@ -731,12 +811,29 @@ $("#memoAdd").addEventListener("click", () => openSheet("#sheetMAdd"));
 $("#sheetMAdd").addEventListener("click", e => {
   const b = e.target.closest("[data-add]"); if (!b) return;
   closeSheet("#sheetMAdd");
-  openMemoEdit(b.dataset.add, null);
+  if (b.dataset.add === "image") $("#memoFile").click();
+  else openMemoEdit(b.dataset.add, null);
+});
+/* えらばれた写真を物置へ入れ、一覧に1件足す。名前はファイル名から。 */
+$("#memoFile").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";                                  // 同じ写真をもう一度えらべるように
+  if (!f) return;
+  const id = uid();
+  setMsg("画像を取りこんでいます…");
+  makeThumb(f, 320)
+    .then(th => Promise.all([filePut("img-" + id, f), th && filePut("th-" + id, th)]))
+    .then(() => {
+      st.memo.push({ id: id, kind: "image", name: f.name.replace(/\.[^.]+$/, "").slice(0, 120),
+                     body: "", parent: memoAt, at: keyOf(new Date()), lock: "" });
+      save(); memoSig = ""; renderMemo(); setMsg("入れました");
+    })
+    .catch(() => setMsg("取りこめませんでした"));
 });
 $("#memoBack").addEventListener("click", () => {
   const here = memoOf(memoAt);
   memoAt = here ? here.parent : "";
-  renderMemo();
+  memoSig = ""; renderMemo();
 });
 $("#mmCancel").addEventListener("click", () => closeSheet("#sheetMEdit"));
 $("#mmSave").addEventListener("click", () => {
@@ -747,7 +844,7 @@ $("#mmSave").addEventListener("click", () => {
   if (target) { target.name = name; if (target.kind !== "folder") target.body = body; }
   else st.memo.push({ id: uid(), kind: mEditKind, name: name, body: body,
                       parent: memoAt, at: keyOf(new Date()) });
-  save(); renderMemo(); closeSheet("#sheetMEdit");
+  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMEdit");
 });
 
 /* 一覧を押したとき。フォルダなら中へ、メモなら編集の窓へ。 */
@@ -755,9 +852,28 @@ $("#memoList").addEventListener("click", e => {
   const b = e.target.closest("[data-act='mopen']"); if (!b) return;
   if (Date.now() - mHoldEnd < HOLD_EAT) return;        // 長押し直後の一押しは飲みこむ
   const m = memoOf(b.dataset.id); if (!m) return;
-  if (m.kind === "folder") { memoAt = m.id; renderMemo(); }
-  else openMemoEdit("note", m.id);
+  if (isShut(m)) { askWord(m.id); return; }            // 鍵がかかっていれば、まず合言葉
+  openMemoItem(m);
 });
+function openMemoItem(m) {
+  if (m.kind === "folder") { memoAt = m.id; memoSig = ""; renderMemo(); }
+  else if (m.kind === "image") openMemoView(m.id);
+  else openMemoEdit("note", m.id);
+}
+/* 画像を大きく見る */
+let mvUrl = "";
+function openMemoView(id) {
+  const m = memoOf(id); if (!m) return;
+  $("#mvHead").textContent = memoName(m);
+  fileGet("img-" + id).then(b => {
+    if (mvUrl) URL.revokeObjectURL(mvUrl);
+    mvUrl = b ? URL.createObjectURL(b) : "";
+    $("#mvImg").src = mvUrl;
+    $("#mvImg").alt = memoName(m);
+    openSheet("#sheetMView");
+  });
+}
+$("#mvClose").addEventListener("click", () => closeSheet("#sheetMView"));
 
 /* 長押しで設定の窓。指がずれたら、なぞりとみなして取り消す。 */
 let mHoldT = null, mHoldFrom = null, mHoldEnd = 0;
@@ -785,6 +901,51 @@ function openMemoMenu(id) {
   $("#miDelete").textContent = "削除";
   openSheet("#sheetMItem");
 }
+/* 閲覧制限（かくすだけ）。合言葉はそのまま保存されるので、
+   バックアップの文字列を見られたら中身も合言葉も分かる。人目よけの錠前。 */
+$("#miLock").addEventListener("click", () => {
+  const m = memoOf(mMenuFor); if (!m) return;
+  closeSheet("#sheetMItem");
+  $("#mlWord").value = m.lock || "";
+  openSheet("#sheetMLock");
+  setTimeout(() => $("#mlWord").focus(), 60);
+});
+$("#mlOn").addEventListener("click", () => {
+  const m = memoOf(mMenuFor); if (!m) return;
+  const w = $("#mlWord").value.trim();
+  if (!w) { setMsg("合言葉を入れてください", true); return; }
+  m.lock = w; opened.add(m.id);              // かけた直後は開いたままにしておく
+  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
+  setMsg("閲覧制限をかけました");
+});
+$("#mlOff").addEventListener("click", () => {
+  const m = memoOf(mMenuFor); if (!m) return;
+  m.lock = ""; opened.delete(m.id);
+  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
+  setMsg("閲覧制限をはずしました");
+});
+
+/* 合言葉を聞く。合っていれば、このアプリを閉じるまでは開いたままにする。 */
+let askFor = null;
+function askWord(id) {
+  const m = memoOf(id); if (!m) return;
+  askFor = id;
+  $("#moHead").textContent = memoName(m);
+  $("#moWord").value = ""; $("#moNg").hidden = true;
+  openSheet("#sheetMOpen");
+  setTimeout(() => $("#moWord").focus(), 60);
+}
+$("#moCancel").addEventListener("click", () => closeSheet("#sheetMOpen"));
+$("#moOk").addEventListener("click", () => {
+  const m = memoOf(askFor); if (!m) return;
+  if ($("#moWord").value.trim() !== m.lock) { $("#moNg").hidden = false; return; }
+  opened.add(m.id);
+  closeSheet("#sheetMOpen");
+  memoSig = ""; renderMemo();
+  openMemoItem(m);
+});
+$("#moWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#moOk").click(); });
+
 $("#miRename").addEventListener("click", () => {
   const m = memoOf(mMenuFor); if (!m) return;
   closeSheet("#sheetMItem");
@@ -804,10 +965,13 @@ $("#miDelete").addEventListener("click", e => {
     setTimeout(() => { if (mDelArm) { mDelArm = false; e.target.textContent = "削除"; } }, 3500);
     return;
   }
+  // 画像は物置のほうも消す（メモ側の目印だけ消しても、本体が残ってしまう）
+  st.memo.filter(x => gone.includes(x.id) && x.kind === "image")
+    .forEach(x => { fileDel("img-" + x.id); fileDel("th-" + x.id); });
   st.memo = st.memo.filter(x => !gone.includes(x.id));
   if (gone.includes(memoAt)) memoAt = "";
   mDelArm = false; e.target.textContent = "削除";
-  save(); renderMemo(); closeSheet("#sheetMItem");
+  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMItem");
 });
 
 /* ---------- sheets ---------- */
