@@ -744,7 +744,7 @@ const isShut = m => !!m.lock && !opened.has(m.id);   // 鍵がかかっていて
 function renderMemo() {
   const here = memoAt ? memoOf(memoAt) : null;
   if (memoAt && !here) memoAt = "";                    // 開いていたフォルダが消えていたら上へ戻す
-  $("#memoWhere").textContent = here ? memoName(here) : "メモ";
+  $("#memoWhere").textContent = here ? memoName(here) : "書庫";
   $("#memoBack").hidden = !memoAt;
 
   // フォルダが先、それぞれ新しいものが上
@@ -1242,6 +1242,50 @@ $$(".sheet.side").forEach(el => {
     touch = null; way = ""; dx = 0;
     el.style.transition = ""; el.style.transform = "";  // ここから先は CSS のすべりに任せる
     if (shut) closeSheet("#" + el.id);
+  };
+  el.addEventListener("touchend", () => release(true));
+  // 端末に横取りされた（電話が来たなど）ときは、閉じずに元へ戻す
+  el.addEventListener("touchcancel", () => release(false));
+});
+
+/* 下から出るシートは、指で下へなぞって閉じる。上の短い棒はそのための取っ手。
+   取っ手からなら always、中身からのときは いちばん上まで戻っているときだけ受けつける
+   （読んでいる途中や、文字を書いている最中に閉じてしまわないように）。 */
+$$(".sheet:not(.side)").forEach(el => {
+  const SLOP = 12;     // これだけ動いてから、上か下かを決める
+  const CLOSE = 90;    // これだけ下へ行ったら、そのまま閉じる
+  let touch = null, y0 = 0, dy = 0, way = "";
+
+  el.addEventListener("touchstart", e => {
+    if (touch !== null || e.touches.length !== 1) return;
+    const grab = e.target.closest(".grab, .sheettitle");
+    if (!grab && (el.scrollTop > 0 || e.target.closest("input, textarea, select"))) return;
+    touch = e.touches[0].identifier; y0 = e.touches[0].clientY; dy = 0; way = "";
+  }, { passive: true });
+
+  el.addEventListener("touchmove", e => {
+    if (touch === null) return;
+    const t = Array.prototype.find.call(e.touches, x => x.identifier === touch);
+    if (!t) return;
+    const ay = t.clientY - y0;
+    if (!way) {
+      if (Math.abs(ay) < SLOP) return;
+      way = ay > 0 ? "shita" : "ue";
+      if (way === "shita") el.style.transition = "none";
+    }
+    if (way !== "shita") return;
+    dy = Math.max(0, ay);                              // 下へだけ動かす
+    el.style.transform = "translateY(" + dy + "px)";
+    if (e.cancelable) e.preventDefault();              // なぞっている間は中身を上下させない
+  }, { passive: false });
+
+  const release = commit => {
+    if (touch === null) return;
+    const shut = commit && way === "shita" && dy > CLOSE;
+    touch = null; way = ""; dy = 0;
+    el.style.transition = "";
+    if (shut) closeSheet("#" + el.id);   // 先にたたむ指示を出してから
+    el.style.transform = "";             // 手を離す。指の位置から続けてすべって消える
   };
   el.addEventListener("touchend", () => release(true));
   // 端末に横取りされた（電話が来たなど）ときは、閉じずに元へ戻す
