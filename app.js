@@ -975,16 +975,18 @@ $("#miDelete").addEventListener("click", e => {
 });
 
 /* ---------- sheets ---------- */
-function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); }
+function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); paintBar(); }
 /* 1枚だけ閉じる。ミッションを保存したときに、その下のステータス画面まで
    一緒に閉じてしまわないように、閉じるのは自分の分だけにする。 */
 function closeSheet(id) {
   $(id).classList.remove("on");
   $("#scrim").classList.toggle("on", $$(".sheet.on").length > 0);
+  paintBar();
 }
 function closeSheets() {                       // 全部たたむ（タブを移ったときなど）
   $("#scrim").classList.remove("on");
   $$(".sheet").forEach(x => x.classList.remove("on"));
+  paintBar();
 }
 /* シートの外を押したら閉じる。閉じるのはいちばん手前の1枚だけなので、
    ステータス画面の上でミッションを編集していても、後ろまでは消えない。
@@ -1639,10 +1641,22 @@ function applyTheme() {
   const root = document.documentElement;
   if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
   $$("#themePills .pill").forEach(p => p.classList.toggle("on", p.dataset.t === t));
-  let dark = t === "dark";
-  if (t === "auto" && window.matchMedia) dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  barDark = t === "dark";
+  if (t === "auto" && window.matchMedia) barDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  paintBar();
+}
+/* iPhoneのステータスバーの色。ホーム画面に追加したアプリでは、この meta か
+   ページの中身から色が決まる。下から出るシートを開いているあいだは、後ろを暗くする
+   覆いと同じ色にそろえ、閉じたら元へ戻す。「閉じたら必ず塗り直させる」のが目的。
+   右から出るパネルは画面いっぱいの別ページなので、暗くはしない。 */
+let barDark = false;
+function paintBar() {
   const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute("content", dark ? "#0d1020" : "#f3f5fc");
+  if (!m) return;
+  const dim = $$(".sheet.on:not(.side)").length > 0;
+  m.setAttribute("content", barDark
+    ? (dim ? "#090914" : "#0d1020")     // 覆い rgba(10,8,20,.5) を重ねた色
+    : (dim ? "#7f7f88" : "#f3f5fc"));
 }
 /* ---------- 通知 ---------- */
 /* いまできるのは「許可をもらう」「テストで1通出す」まで。
