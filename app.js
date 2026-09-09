@@ -109,7 +109,7 @@ function normalize(o) {
 
   /* メモ。フォルダも中身も同じ1本の配列で持ち、parent でぶら下がりを表す。
      こうしておくと、あとで移動や入れ子を足すときに形を変えずに済む。 */
-  let oldWord = "";                    // 昔の形（項目ごとの合言葉）から引き継ぐ用
+  let oldWord = "";                    // 昔の形（項目ごとのパスワード）から引き継ぐ用
   o.memo = asArr(o.memo).map(x => {
     const m = asObj(x);
     const w = asStr(m.lock);           // 昔の形。いまは項目ごとに持たない
@@ -121,10 +121,10 @@ function normalize(o) {
       body: asStr(m.body),
       parent: asStr(m.parent),
       at: asDate(m.at),
-      hide: !!m.hide || !!w            // 隠すかどうか。合言葉はアプリに1つ（o.pass）
+      hide: !!m.hide || !!w            // 隠すかどうか。パスワードはアプリに1つ（o.pass）
     };
   });
-  // 合言葉はアプリで1つ。昔の控えから来たときは、最初に見つけたものを引き継ぐ。
+  // パスワードはアプリで1つ。昔の控えから来たときは、最初に見つけたものを引き継ぐ。
   o.pass = (asStr(o.pass) || oldWord).slice(0, 60);
   // 親が消えているものは、いちばん上に戻す（迷子を作らない）
   o.memo.forEach(m => { if (m.parent && !o.memo.some(x => x.kind === "folder" && x.id === m.parent)) m.parent = ""; });
@@ -641,7 +641,7 @@ function renderGoals() {
   const done = st.goals.filter(g => g.done);
   const o = $("#goalList"), d = $("#goalDone");
   o.innerHTML = open.length ? open.map(goalCard).join("")
-    : '<div class="empty">長期目標はまだありません。<br>「＋ 追加」から、時間のかかる目標を書いてみましょう。</div>';
+    : '<div class="empty">長期目標はまだありません。</div>';
   d.innerHTML = done.map(goalCard).join("");
   $("#goalDoneSec").hidden = done.length === 0;
   [o, d].forEach(x => { x.style.display = "flex"; x.style.flexDirection = "column"; x.style.gap = "10px"; });
@@ -737,7 +737,7 @@ function makeThumb(file, max) {
    いま開いているフォルダは memoAt（空文字＝いちばん上）。 */
 let memoAt = "", mEditing = null, mEditKind = "note", mMenuFor = null, mDelArm = false;
 let memoSig = "", thumbUrls = [];
-let unlocked = false;              // 合言葉を通したか。アプリを離れると false に戻す（下の visibilitychange）
+let unlocked = false;              // パスワードを通したか。アプリを離れると false に戻す（下の visibilitychange）
 const ICO_FOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/></svg>';
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
 const ICO_LOCK = '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>';
@@ -747,7 +747,7 @@ const ICO_HFOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10
 const memoOf = id => st.memo.find(x => x.id === id);
 const memoIn = pid => st.memo.filter(x => x.parent === pid);
 const memoName = m => m.name || ("名前のない" + (m.kind === "folder" ? "フォルダ" : m.kind === "image" ? "画像" : "メモ"));
-const isShut = m => !!m.hide && !unlocked;   // 隠してあって、まだ合言葉を通していない
+const isShut = m => !!m.hide && !unlocked;   // 隠してあって、まだパスワードを通していない
 
 function renderMemo() {
   const here = memoAt ? memoOf(memoAt) : null;
@@ -770,7 +770,7 @@ function renderMemo() {
 
   $("#memoList").innerHTML = sorted.length ? sorted.map(m => {
     const shut = isShut(m);
-    const sub = shut ? '<div class="mlock">合言葉で見られます</div>'
+    const sub = shut ? '<div class="mlock">パスワードで見られます</div>'
       : m.kind === "folder" ? '<div class="mbody">' + memoIn(m.id).length + "件</div>"
       : m.kind === "note" && m.body ? '<div class="mbody">' + esc(m.body) + "</div>"
       : "";
@@ -784,7 +784,7 @@ function renderMemo() {
     return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' + head +
       '<div class="rowbody"><div class="rowtitle">' + esc(memoName(m)) + "</div>" + sub +
       "</div></div>";
-  }).join("") : '<div class="empty">まだ何もありません。<br>右上の「＋ 追加」から作れます。</div>';
+  }).join("") : '<div class="empty">まだ何もありません。</div>';
   $("#memoList").style.display = "flex";
   $("#memoList").style.flexDirection = "column";
   $("#memoList").style.gap = "10px";
@@ -826,7 +826,7 @@ $("#sheetMAdd").addEventListener("click", e => {
   closeSheet("#sheetMAdd");
   if (b.dataset.add === "image") { $("#memoFile").click(); return; }
   if (b.dataset.add === "hidden") {                    // 中身をまとめて隠す入れ物
-    if (!st.pass) { openPass(() => openMemoEdit("hidden", null)); return; }   // 先に合言葉を決める
+    if (!st.pass) { openPass(() => openMemoEdit("hidden", null)); return; }   // 先にパスワードを決める
     openMemoEdit("hidden", null); return;
   }
   openMemoEdit(b.dataset.add, null);
@@ -870,7 +870,7 @@ $("#memoList").addEventListener("click", e => {
   const b = e.target.closest("[data-act='mopen']"); if (!b) return;
   if (Date.now() - mHoldEnd < HOLD_EAT) return;        // 長押し直後の一押しは飲みこむ
   const m = memoOf(b.dataset.id); if (!m) return;
-  if (isShut(m)) { askWord(() => openMemoItem(m)); return; }   // 隠してあれば、まず合言葉
+  if (isShut(m)) { askWord(() => openMemoItem(m)); return; }   // 隠してあれば、まずパスワード
   openMemoItem(m);
 });
 function openMemoItem(m) {
@@ -920,8 +920,8 @@ function openMemoMenu(id) {
   $("#miLock").textContent = m.hide ? "隠すのをやめる" : "隠す";
   openSheet("#sheetMItem");
 }
-/* 隠す／隠さない。合言葉はアプリに1つ（st.pass）なので、ここでは印を付けるだけ。
-   まだ合言葉が無いときは、先に決めてもらう。 */
+/* 隠す／隠さない。パスワードはアプリに1つ（st.pass）なので、ここでは印を付けるだけ。
+   まだパスワードが無いときは、先に決めてもらう。 */
 $("#miLock").addEventListener("click", () => {
   const m = memoOf(mMenuFor); if (!m) return;
   closeSheet("#sheetMItem");
@@ -936,14 +936,14 @@ $("#miLock").addEventListener("click", () => {
   if (!st.pass) openPass(go); else go();
 });
 
-/* 合言葉を決める・変える。変えるときは、いまの合言葉が要る。 */
+/* パスワードを決める・変える。変えるときは、いまのパスワードが要る。 */
 let passThen = null;
 function openPass(then) {
   passThen = then || null;
   const has = !!st.pass;
-  $("#mlHead").textContent = has ? "合言葉を変える" : "合言葉を決める";
+  $("#mlHead").textContent = has ? "パスワードを変える" : "パスワードを決める";
   $("#mlOldWrap").hidden = !has;
-  $("#mlNewLab").textContent = has ? "新しい合言葉" : "合言葉";
+  $("#mlNewLab").textContent = has ? "新しいパスワード" : "パスワード";
   $("#mlOld").value = ""; $("#mlWord").value = ""; $("#mlNg").hidden = true;
   $("#mlOn").textContent = has ? "変える" : "決める";
   openSheet("#sheetMLock");
@@ -953,20 +953,20 @@ $("#mlCancel").addEventListener("click", () => { passThen = null; closeSheet("#s
 $("#mlOn").addEventListener("click", () => {
   const w = $("#mlWord").value.trim();
   if (st.pass && $("#mlOld").value.trim() !== st.pass) { $("#mlNg").hidden = false; return; }
-  if (!w) { setMsg("合言葉を入れてください", true); return; }
+  if (!w) { setMsg("パスワードを入れてください", true); return; }
   const first = !st.pass;
   st.pass = w; unlocked = true;                // 決めた本人は、そのまま見られる
   save(); paintPass(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
-  setMsg(first ? "合言葉を決めました" : "合言葉を変えました");
+  setMsg(first ? "パスワードを決めました" : "パスワードを変えました");
   const f = passThen; passThen = null; if (f) f();
 });
 $("#mlWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#mlOn").click(); });
 
-/* 合言葉を聞く。合っていれば、隠してあるものが「まとめて」見えるようになる。 */
+/* パスワードを聞く。合っていれば、隠してあるものが「まとめて」見えるようになる。 */
 let askThen = null;
 function askWord(then) {
   askThen = then || null;
-  $("#moHead").textContent = "合言葉";
+  $("#moHead").textContent = "パスワード";
   $("#moWord").value = ""; $("#moNg").hidden = true;
   openSheet("#sheetMOpen");
   setTimeout(() => $("#moWord").focus(), 60);
@@ -981,10 +981,10 @@ $("#moOk").addEventListener("click", () => {
 });
 $("#moWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#moOk").click(); });
 
-/* 設定画面の「書庫の合言葉」 */
+/* 設定画面の「書庫のパスワード」 */
 function paintPass() {
   $("#passState").textContent = st.pass ? "決めてあります" : "まだ決めていません";
-  $("#passBtn").textContent = st.pass ? "合言葉を変える" : "合言葉を決める";
+  $("#passBtn").textContent = st.pass ? "パスワードを変える" : "パスワードを決める";
 }
 $("#passBtn").addEventListener("click", () => openPass(null));
 

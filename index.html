@@ -75,9 +75,14 @@
       <div class="sec">
         <div class="sechead">
           <!-- いまどのフォルダにいるか。いちばん上では「書庫」 -->
-          <div class="sectitle" id="memoWhere">書庫</div>
+          <!-- 見出しの中の文字はフォルダ名に差し替わるので、「?」は外に出しておく -->
+          <div class="sectitle">
+            <span id="memoWhere">書庫</span>
+            <button class="helpbtn" data-act="help" data-help="n-memo" aria-controls="n-memo" aria-expanded="false" aria-label="説明を見る">?</button>
+          </div>
           <button class="addbtn" id="memoAdd">＋ 追加</button>
         </div>
+        <div class="helptext" id="n-memo"><div class="note">右上の「＋ 追加」から、フォルダ・メモ・画像を入れられます。フォルダは中に入れ子にもできます。<br>並んでいるものを<b>長押し</b>すると、名前の変更・隠す・削除ができます。<br>「非表示フォルダ」は中身をまとめて隠す入れ物です。隠したものを見るにはパスワードが要ります（設定で決めます）。</div></div>
         <button class="btn memoback" id="memoBack" hidden>← ひとつ上へ</button>
         <div id="memoList"></div>
       </div>
@@ -113,10 +118,10 @@
       </div>
 
       <div class="card">
-        <div class="lab">書庫の合言葉<button class="helpbtn" data-act="help" data-help="n-pass" aria-controls="n-pass" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="lab">書庫のパスワード<button class="helpbtn" data-act="help" data-help="n-pass" aria-controls="n-pass" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <div class="note" id="passState">まだ決めていません</div>
-        <button class="btn" id="passBtn">合言葉を決める</button>
-        <div class="helptext" id="n-pass"><div class="note">書庫で隠したものを見るときの合言葉です。アプリ全体で1つだけ。<b>かくすだけ</b>の仕組みなので、バックアップの文字列には合言葉も中身もそのまま入ります。人目よけとお考えください。</div></div>
+        <button class="btn" id="passBtn">パスワードを決める</button>
+        <div class="helptext" id="n-pass"><div class="note">書庫で隠したものを見るときのパスワードです。アプリ全体で1つだけ。<b>かくすだけ</b>の仕組みなので、バックアップの文字列にはパスワードも中身もそのまま入ります。人目よけとお考えください。</div></div>
       </div>
 
       <div class="card">
@@ -430,21 +435,21 @@
   </div>
 </div>
 
-<!-- 書庫の合言葉を決める／変える -->
+<!-- 書庫のパスワードを決める／変える -->
 <div class="sheet" id="sheetMLock">
   <div class="sheetin">
     <div class="grab"></div>
-    <div class="sheettitle" id="mlHead">合言葉を決める</div>
+    <div class="sheettitle" id="mlHead">パスワードを決める</div>
     <div id="mlOldWrap" hidden>
-      <div class="lab" style="margin-bottom:6px">いまの合言葉</div>
-      <input class="field" id="mlOld" type="password" placeholder="いまの合言葉" autocomplete="off">
+      <div class="lab" style="margin-bottom:6px">いまのパスワード</div>
+      <input class="field" id="mlOld" type="password" placeholder="いまのパスワード" autocomplete="off">
     </div>
     <div>
-      <div class="lab" style="margin-bottom:6px" id="mlNewLab">新しい合言葉</div>
-      <input class="field" id="mlWord" type="password" placeholder="合言葉" autocomplete="off">
+      <div class="lab" style="margin-bottom:6px" id="mlNewLab">新しいパスワード</div>
+      <input class="field" id="mlWord" type="password" placeholder="パスワード" autocomplete="off">
     </div>
-    <div class="note" id="mlNg" hidden>いまの合言葉がちがいます。</div>
-    <div class="note">アプリ全体で1つだけの合言葉です。書庫で隠したものは、これを入れると<b>まとめて見えます</b>（アプリを離れると、また隠れます）。</div>
+    <div class="note" id="mlNg" hidden>いまのパスワードがちがいます。</div>
+    <div class="note">アプリ全体で1つだけのパスワードです。書庫で隠したものは、これを入れると<b>まとめて見えます</b>（アプリを離れると、また隠れます）。</div>
     <div class="btnrow">
       <button class="btn" id="mlCancel">やめる</button>
       <button class="btn pri" id="mlOn">決める</button>
@@ -456,8 +461,8 @@
 <div class="sheet" id="sheetMOpen">
   <div class="sheetin">
     <div class="grab"></div>
-    <div class="sheettitle" id="moHead">合言葉</div>
-    <input class="field" id="moWord" type="password" placeholder="合言葉" autocomplete="off">
+    <div class="sheettitle" id="moHead">パスワード</div>
+    <input class="field" id="moWord" type="password" placeholder="パスワード" autocomplete="off">
     <div class="note" id="moNg" hidden>ちがいます。</div>
     <div class="btnrow">
       <button class="btn" id="moCancel">やめる</button>
