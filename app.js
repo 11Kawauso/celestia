@@ -204,10 +204,12 @@ function save() {
     if (!saveWarned) { saveWarned = true; setMsg("保存できませんでした。端末の空き容量を確認してください。", true); }
   }
 }
+/* 短い知らせ。置き場所は画面ごとにあるので、出ているほうに書く。 */
 function setMsg(t, bad) {
-  const m = $("#setMsg"); if (!m) return;
-  m.textContent = t; m.style.color = bad ? "var(--bad)" : "var(--ok)";
-  clearTimeout(setMsg.t); setMsg.t = setTimeout(() => { m.textContent = ""; }, 3200);
+  const all = $$(".msg"); if (!all.length) return;
+  all.forEach(m => { m.textContent = t; m.style.color = bad ? "var(--bad)" : "var(--ok)"; });
+  clearTimeout(setMsg.t);
+  setMsg.t = setTimeout(() => { all.forEach(m => { m.textContent = ""; }); }, 3200);
 }
 
 /* ---------- level ---------- */
@@ -1584,7 +1586,8 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") { paintBackup(); paintNotify(); paintPass(); renderRem(); }
+  if (t.dataset.v === "set") { paintBackup(); paintPass(); }
+  if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });

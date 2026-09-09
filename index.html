@@ -88,24 +88,8 @@
       </div>
     </section>
 
-    <!-- SETTINGS -->
-    <section class="view" id="v-set">
-      <div class="card">
-        <div class="lab">あなたの名前<button class="helpbtn" data-act="help" data-help="n-user" aria-controls="n-user" aria-expanded="false" aria-label="説明を見る">?</button></div>
-        <input class="field" id="userName" placeholder="呼ばれたい名前" maxlength="20" enterkeyhint="done">
-        <div class="helptext" id="n-user"><div class="note">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div></div>
-      </div>
-
-      <div class="card">
-        <div class="lab">見た目<button class="helpbtn" data-act="help" data-help="n-theme" aria-controls="n-theme" aria-expanded="false" aria-label="説明を見る">?</button></div>
-        <div class="pills" id="themePills">
-          <button class="pill" data-t="auto">自動</button>
-          <button class="pill" data-t="dark">夜（紺）</button>
-          <button class="pill" data-t="light">昼（白）</button>
-        </div>
-        <div class="helptext" id="n-theme"><div class="note">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div></div>
-      </div>
-
+    <!-- NOTIFY -->
+    <section class="view" id="v-notify">
       <div class="card">
         <div class="lab">通知<button class="helpbtn" data-act="help" data-help="n-notice" aria-controls="n-notice" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <div class="toggrow">
@@ -123,6 +107,27 @@
         <div id="remList"></div>
         <button class="btn" id="remAdd">＋ 追加</button>
         <div class="helptext" id="n-rem"><div class="note">決まった間隔でセレスティアが知らせます。予定と違って日付を書かず、「毎日」「◯日おき」「曜日をえらぶ」の決まりだけを置きます。<br>例：タオルを2日おきに替える、ゴミ出しを毎週火曜と金曜に。<br>この先30日ぶんをサーバーに預けます。<b>名前は送らず</b>、番号と時刻だけを預けて、文面は端末の中で作ります。</div></div>
+      </div>
+
+      <div class="msg" id="remMsg"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-set">
+      <div class="card">
+        <div class="lab">あなたの名前<button class="helpbtn" data-act="help" data-help="n-user" aria-controls="n-user" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <input class="field" id="userName" placeholder="呼ばれたい名前" maxlength="20" enterkeyhint="done">
+        <div class="helptext" id="n-user"><div class="note">セレスティアがあなたを呼ぶときに使う名前です。空のままでもかまいません。</div></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">見た目<button class="helpbtn" data-act="help" data-help="n-theme" aria-controls="n-theme" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="pills" id="themePills">
+          <button class="pill" data-t="auto">自動</button>
+          <button class="pill" data-t="dark">夜（紺）</button>
+          <button class="pill" data-t="light">昼（白）</button>
+        </div>
+        <div class="helptext" id="n-theme"><div class="note">「自動」は端末のライト／ダーク設定に合わせます。PCとスマホで見え方が違うのはこのためです。どちらかに固定したいときはここで選んでください。</div></div>
       </div>
 
       <div class="card">
@@ -188,6 +193,7 @@
     <button class="tab" data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>カレンダー</button>
     <button class="tab" data-v="goal"><svg viewBox="0 0 24 24"><path d="M6 21V4.5"/><path d="M6 4.5h11.5l-2.6 4 2.6 4H6"/></svg>目標</button>
     <button class="tab" data-v="memo"><svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>書庫</button>
+    <button class="tab" data-v="notify"><svg viewBox="0 0 24 24"><path d="M12 4a5.5 5.5 0 015.5 5.5c0 4 1.5 5.5 2 6H4.5c.5-.5 2-2 2-6A5.5 5.5 0 0112 4z"/><path d="M10 19a2 2 0 004 0"/></svg>通知</button>
     <button class="tab" data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"/></svg>設定</button>
   </div>
 </nav>
