@@ -24,7 +24,7 @@ function seed() {
     missions: [
       wakeMission(uid(), WAKE_DEFAULT)
     ],
-    goals: [], memo: [], pass: "",
+    goals: [], memo: [], pass: "", reminders: [],
     events: {}, log: {}, theme: "auto", notify: false
   };
 }
@@ -129,6 +129,24 @@ function normalize(o) {
   // 親が消えているものは、いちばん上に戻す（迷子を作らない）
   o.memo.forEach(m => { if (m.parent && !o.memo.some(x => x.kind === "folder" && x.id === m.parent)) m.parent = ""; });
 
+  /* くりかえし通知。予定と違って日付を持たず、決まりだけを持つ。
+     rule は "daily"（毎日）／"every"（n日おき、from が起点）／"week"（曜日えらび）。 */
+  o.reminders = asArr(o.reminders).map(x => {
+    const r = asObj(x);
+    const rule = ["daily", "every", "week"].includes(r.rule) ? r.rule : "daily";
+    let days = asArr(r.days).map(Number).filter(d => d >= 0 && d <= 6);
+    if (rule === "week" && !days.length) days = [0, 1, 2, 3, 4, 5, 6];
+    return {
+      id: asStr(r.id) || uid(),
+      title: asStr(r.title).slice(0, 60),
+      time: asTime(r.time) || "08:00",
+      rule: rule,
+      n: Math.min(30, Math.max(2, Math.round(+r.n || 2))),   // 何日おきか（2〜30）
+      from: asDate(r.from) || keyOf(new Date()),             // n日おきの起点
+      days: days
+    };
+  }).filter(r => r.title);
+
   const ev = asObj(o.events); o.events = {};
   Object.keys(ev).forEach(k => {
     const list = asArr(ev[k]).map(y => {
@@ -170,7 +188,9 @@ async function mirror() {
     Object.keys(st.events).forEach(k => { if (k >= today) days[k] = st.events[k]; });
     const box = await caches.open(STATE_CACHE);
     await box.put(STATE_KEY, new Response(JSON.stringify({
-      level: st.chara.level, user: st.user, events: days
+      level: st.chara.level, user: st.user, events: days,
+      // 通知の文面を作るのに要るぶんだけ
+      reminders: st.reminders.map(r => ({ id: r.id, title: r.title, time: r.time }))
     }), { headers: { "content-type": "application/json" } }));
   } catch (e) { /* 写せなくても本体は動く */ }
 }
@@ -1564,7 +1584,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") { paintBackup(); paintNotify(); paintPass(); }
+  if (t.dataset.v === "set") { paintBackup(); paintNotify(); paintPass(); renderRem(); }
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
@@ -1644,6 +1664,108 @@ $("#gDelete").addEventListener("click", e => {
   st.goals = st.goals.filter(g => g.id !== gediting);
   gDelArm = false; e.target.textContent = "この目標を消す";
   save(); render(); closeSheet("#sheetG");
+});
+
+/* ---------- くりかえし通知 ---------- */
+/* 予定と違って日付を持たず、決まりだけを持つ。鳴らす日は remDays が数える。 */
+let rmEditing = null, rmDraft = null;
+const ruleText = r => r.rule === "daily" ? "毎日"
+  : r.rule === "week" ? DOW.filter((_, i) => r.days.includes(i)).join("・") + "曜"
+  : r.n + "日おき";
+
+function renderRem() {
+  $("#remOff").hidden = canNotify();
+  const list = st.reminders;
+  $("#remList").innerHTML = list.length ? list.map(r => {
+    const nx = remNext(r);
+    return '<div class="row" data-act="remedit" data-id="' + esc(r.id) + '">' +
+      '<div class="rowbody"><div class="rowtitle">' + esc(r.title) + "</div>" +
+      '<div class="chips"><span class="chip time">' + esc(r.time) + "</span>" +
+      '<span class="chip">' + esc(ruleText(r)) + "</span>" +
+      (nx ? '<span class="chip">次は' + (nx.getMonth() + 1) + "/" + nx.getDate() + "</span>" : "") +
+      "</div></div></div>";
+  }).join("") : '<div class="empty">まだありません。</div>';
+  $("#remList").style.display = "flex";
+  $("#remList").style.flexDirection = "column";
+  $("#remList").style.gap = "9px";
+}
+
+$("#rmDays").innerHTML = DOW.map((d, i) => '<button class="day" data-d="' + i + '">' + d + "</button>").join("");
+
+function paintRm() {
+  const r = rmDraft;
+  $$("#rmRule .pill").forEach(p => p.classList.toggle("on", p.dataset.r === r.rule));
+  $("#rmEveryWrap").hidden = r.rule !== "every";
+  $("#rmDaysWrap").hidden = r.rule !== "week";
+  $$("#rmDays .day").forEach(b => b.classList.toggle("on", r.days.includes(+b.dataset.d)));
+  const nx = r.title || true ? remNext(r) : null;
+  $("#rmNext").textContent = nx
+    ? "次に知らせるのは " + (nx.getMonth() + 1) + "月" + nx.getDate() + "日 " + r.time + " です。"
+    : "いまの決まりでは、この先30日は鳴りません。";
+}
+function openRem(id) {
+  const src = id && st.reminders.find(x => x.id === id);
+  rmEditing = id || null;
+  rmDraft = src ? JSON.parse(JSON.stringify(src))
+    : { id: uid(), title: "", time: "08:00", rule: "every", n: 2, from: keyOf(new Date()), days: [] };
+  $("#rmHead").textContent = src ? "くりかえし通知" : "くりかえし通知を追加";
+  $("#rmName").value = rmDraft.title;
+  $("#rmTime").value = rmDraft.time;
+  $("#rmN").value = rmDraft.n;
+  $("#rmFrom").value = rmDraft.from;
+  $("#rmDelete").hidden = !src;
+  paintRm();
+  openSheet("#sheetRem");
+  if (!src) setTimeout(() => $("#rmName").focus(), 60);
+}
+/* 入力のたびに下書きへ写して、次に鳴る日を出しなおす */
+function grabRm() {
+  rmDraft.title = $("#rmName").value.trim();
+  rmDraft.time = $("#rmTime").value || "08:00";
+  rmDraft.n = Math.min(30, Math.max(2, Math.round(+$("#rmN").value || 2)));
+  rmDraft.from = $("#rmFrom").value || keyOf(new Date());
+}
+["#rmName", "#rmTime", "#rmN", "#rmFrom"].forEach(sel =>
+  $(sel).addEventListener("input", () => { grabRm(); paintRm(); }));
+$("#rmRule").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  grabRm(); rmDraft.rule = b.dataset.r;
+  if (rmDraft.rule === "week" && !rmDraft.days.length) rmDraft.days = [new Date().getDay()];
+  paintRm();
+});
+$("#rmDays").addEventListener("click", e => {
+  const b = e.target.closest(".day"); if (!b) return;
+  grabRm();
+  const d = +b.dataset.d, i = rmDraft.days.indexOf(d);
+  if (i < 0) rmDraft.days.push(d); else rmDraft.days.splice(i, 1);
+  rmDraft.days.sort();
+  paintRm();
+});
+$("#remAdd").addEventListener("click", () => openRem(null));
+$("#remList").addEventListener("click", e => {
+  const b = e.target.closest("[data-act='remedit']"); if (!b) return;
+  openRem(b.dataset.id);
+});
+$("#rmCancel").addEventListener("click", () => closeSheet("#sheetRem"));
+$("#rmSave").addEventListener("click", () => {
+  grabRm();
+  if (!rmDraft.title) { setMsg("名前を入れてください", true); return; }
+  if (rmDraft.rule === "week" && !rmDraft.days.length) { setMsg("曜日をえらんでください", true); return; }
+  const i = st.reminders.findIndex(x => x.id === rmEditing);
+  if (i >= 0) st.reminders[i] = rmDraft; else st.reminders.push(rmDraft);
+  save(); renderRem(); closeSheet("#sheetRem");
+  setMsg(i >= 0 ? "変えました" : "追加しました");
+});
+let rmDelArm = false;
+$("#rmDelete").addEventListener("click", e => {
+  if (!rmDelArm) {
+    rmDelArm = true; e.target.textContent = "もう一度おす";
+    setTimeout(() => { if (rmDelArm) { rmDelArm = false; e.target.textContent = "この通知を消す"; } }, 3500);
+    return;
+  }
+  rmDelArm = false; e.target.textContent = "この通知を消す";
+  st.reminders = st.reminders.filter(x => x.id !== rmEditing);
+  save(); renderRem(); closeSheet("#sheetRem"); setMsg("消しました");
 });
 
 /* ---------- 控えの文字（圧縮） ---------- */
@@ -1751,6 +1873,7 @@ const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPad は Mac を名乗る
 
 function paintNotify() {
+  if ($("#remOff")) $("#remOff").hidden = canNotify();
   const tog = $("#notifyTog"), lab = $("#notifyLab"), msg = $("#notifyMsg"), test = $("#notifyTest");
   const perm = notifyOK() ? Notification.permission : "unsupported";
   const on = canNotify();
@@ -1866,6 +1989,33 @@ async function sbWrite(path, method, body, prefer) {
   return t;
 }
 
+/* くりかえし通知が次に鳴る日を、この先 REM_DAYS 日ぶん数える。
+   n日おきは「起点の日から数えて n の倍数の日」。曜日えらびは、その曜日の日。 */
+const REM_DAYS = 30;
+function remDays(r, from) {
+  const out = [];
+  const base = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const anchor = new Date(r.from + "T00:00");
+  for (let i = 0; i < REM_DAYS; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    let hit = false;
+    if (r.rule === "daily") hit = true;
+    else if (r.rule === "week") hit = r.days.includes(d.getDay());
+    else {
+      const gap = Math.round((d - anchor) / 86400000);
+      hit = gap >= 0 && gap % r.n === 0;
+    }
+    if (hit) out.push(new Date(d.getFullYear(), d.getMonth(), d.getDate(),
+      +r.time.slice(0, 2), +r.time.slice(3)));
+  }
+  return out;
+}
+/* 次に鳴る日時（過ぎたものは飛ばす）。無ければ null */
+function remNext(r, now) {
+  const t = (now || new Date()).getTime();
+  return remDays(r, new Date(t)).find(d => d.getTime() > t) || null;
+}
+
 /* 鳴らす予定を置き直す。送るのは番号・日付・時刻だけで、名前は送らない。
    過ぎたものは送らない。多すぎるときは近い順に200件まで。 */
 async function syncPings() {
@@ -1874,6 +2024,13 @@ async function syncPings() {
     st.events[k].forEach(e => {
       const at = new Date(notifyAt(k, e));      // 端末の時計で読む＝その土地の時刻
       if (at.getTime() > now) rows.push({ owner: owner, event_id: e.id, day_key: k, fire_at: at.toISOString() });
+    });
+  });
+  // くりかえし通知のぶんも同じ棚に並べる
+  st.reminders.forEach(r => {
+    remDays(r, new Date(now)).forEach(d => {
+      if (d.getTime() > now) rows.push({ owner: owner, event_id: r.id,
+        day_key: keyOf(d), fire_at: d.toISOString() });
     });
   });
   rows.sort((a, b) => a.fire_at.localeCompare(b.fire_at));
@@ -1932,6 +2089,7 @@ if (window.matchMedia) {
 /* ---------- boot ---------- */
 applyTheme();
 paintPass();
+renderRem();
 mirror();
 paintNotify();
 if (canNotify()) syncPings().catch(() => {});

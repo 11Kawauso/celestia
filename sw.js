@@ -61,7 +61,9 @@ async function stateNow() {
 async function buildNotice(d) {
   const st = await stateNow();
   const list = st && st.events && st.events[d.k];
-  const ev = list && list.find(x => x.id === d.id);
+  // 予定に無ければ、くりかえし通知のほうを見る（どちらも控えの中にある）
+  const ev = (list && list.find(x => x.id === d.id)) ||
+    (st && st.reminders && st.reminders.find(x => x.id === d.id));
   if (!ev) return { title: "セレスティア", body: "予定の時間だぞ。" };   // 控えが無いときの保険
   const today = new Date();
   const key = today.getFullYear() + "-" +
