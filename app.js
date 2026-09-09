@@ -563,7 +563,7 @@ function render() {
   renderGoals();
   renderCal();
   if ($("#userName").value !== st.user) $("#userName").value = st.user;
-  if (document.activeElement !== $("#backup")) $("#backup").value = JSON.stringify(st);
+  paintBackup();
 }
 
 function missionRow(m, tk, now, dim) {
@@ -1522,7 +1522,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") { $("#backup").value = JSON.stringify(st); paintNotify(); }
+  if (t.dataset.v === "set") { paintBackup(); paintNotify(); }
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
@@ -1604,6 +1604,45 @@ $("#gDelete").addEventListener("click", e => {
   save(); render(); closeSheet("#sheetG");
 });
 
+/* ---------- 控えの文字（圧縮） ---------- */
+/* 中身は同じで、文字数だけを減らす。JSONは同じ項目名を何度も書くので、
+   よく縮む（貯まってくると8割ほど減る）。
+   頭の CEL1 は「これは圧縮した控えです」という目印。
+   古い控え（{ ではじまる生のJSON）も、これまでどおり読みこめる。 */
+const BK_TAG = "CEL1";
+const hasZip = typeof CompressionStream === "function" && typeof DecompressionStream === "function";
+
+function bytesToB64(u8) {
+  let s2 = "";
+  for (let i = 0; i < u8.length; i += 0x8000) s2 += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s2);
+}
+const b64ToBytes = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
+
+async function packBackup(o) {
+  const json = JSON.stringify(o);
+  if (!hasZip) return json;                 // 圧縮を知らない端末では、これまでどおりの文字
+  try {
+    const cs = new CompressionStream("gzip");
+    const buf = await new Response(new Blob([json]).stream().pipeThrough(cs)).arrayBuffer();
+    return BK_TAG + bytesToB64(new Uint8Array(buf));
+  } catch (e) { return json; }
+}
+async function unpackBackup(text) {
+  const t = String(text).trim();
+  if (t.startsWith("{")) return JSON.parse(t);            // 昔の控え
+  const body = t.startsWith(BK_TAG) ? t.slice(BK_TAG.length) : t;
+  const ds = new DecompressionStream("gzip");
+  const buf = await new Response(new Blob([b64ToBytes(body.replace(/\s+/g, ""))]).stream().pipeThrough(ds)).arrayBuffer();
+  return JSON.parse(new TextDecoder().decode(buf));
+}
+/* 控えの欄を書きかえる。押している最中の欄は触らない。 */
+function paintBackup() {
+  const t = $("#backup");
+  if (!t || document.activeElement === t) return;
+  packBackup(st).then(s2 => { if (document.activeElement !== t) t.value = s2; });
+}
+
 /* ---------- settings ---------- */
 $("#userName").addEventListener("input", e => { st.user = e.target.value; save(); });
 $("#copyBk").addEventListener("click", async () => {
@@ -1612,10 +1651,10 @@ $("#copyBk").addEventListener("click", async () => {
   catch (e) { t.removeAttribute("readonly"); t.select(); t.setSelectionRange(0, 999999); setMsg("選択しました。長押しでコピーしてください"); t.setAttribute("readonly", ""); }
 });
 $("#showRestore").addEventListener("click", () => { const b = $("#restoreBox"); b.hidden = !b.hidden; });
-$("#doRestore").addEventListener("click", () => {
+$("#doRestore").addEventListener("click", async () => {
   const keep = st;   // 失敗したときに戻すための控え
   try {
-    const o = JSON.parse($("#restoreIn").value);
+    const o = await unpackBackup($("#restoreIn").value);   // 圧縮したものも、昔の生のJSONも
     if (!o || typeof o !== "object" || !o.chara) throw new Error("bad");
     st = normalize(o);
     render();          // 先に描いてみる。ここで落ちるなら保存しない
