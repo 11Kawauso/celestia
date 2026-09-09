@@ -24,7 +24,7 @@ function seed() {
     missions: [
       wakeMission(uid(), WAKE_DEFAULT)
     ],
-    goals: [], memo: [],
+    goals: [], memo: [], pass: "",
     events: {}, log: {}, theme: "auto", notify: false
   };
 }
@@ -109,8 +109,11 @@ function normalize(o) {
 
   /* メモ。フォルダも中身も同じ1本の配列で持ち、parent でぶら下がりを表す。
      こうしておくと、あとで移動や入れ子を足すときに形を変えずに済む。 */
+  let oldWord = "";                    // 昔の形（項目ごとの合言葉）から引き継ぐ用
   o.memo = asArr(o.memo).map(x => {
     const m = asObj(x);
+    const w = asStr(m.lock);           // 昔の形。いまは項目ごとに持たない
+    if (w && !oldWord) oldWord = w;
     return {
       id: asStr(m.id) || uid(),
       kind: ["folder", "note", "image"].includes(m.kind) ? m.kind : "note",
@@ -118,9 +121,11 @@ function normalize(o) {
       body: asStr(m.body),
       parent: asStr(m.parent),
       at: asDate(m.at),
-      lock: asStr(m.lock).slice(0, 60)   // 合言葉。空なら制限なし（かくすだけの仕組み）
+      hide: !!m.hide || !!w            // 隠すかどうか。合言葉はアプリに1つ（o.pass）
     };
   });
+  // 合言葉はアプリで1つ。昔の控えから来たときは、最初に見つけたものを引き継ぐ。
+  o.pass = (asStr(o.pass) || oldWord).slice(0, 60);
   // 親が消えているものは、いちばん上に戻す（迷子を作らない）
   o.memo.forEach(m => { if (m.parent && !o.memo.some(x => x.kind === "folder" && x.id === m.parent)) m.parent = ""; });
 
@@ -732,14 +737,17 @@ function makeThumb(file, max) {
    いま開いているフォルダは memoAt（空文字＝いちばん上）。 */
 let memoAt = "", mEditing = null, mEditKind = "note", mMenuFor = null, mDelArm = false;
 let memoSig = "", thumbUrls = [];
-const opened = new Set();          // この起動のあいだ、合言葉を通したもの
+let unlocked = false;              // 合言葉を通したか。アプリを離れると false に戻す（下の visibilitychange）
 const ICO_FOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/></svg>';
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
 const ICO_LOCK = '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>';
+/* 非表示フォルダ。フォルダの形の真ん中に、小さな鍵穴を置く。 */
+const ICO_HFOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/>' +
+  '<circle cx="12" cy="13.5" r="1.7"/><path d="M12 15.2v2"/></svg>';
 const memoOf = id => st.memo.find(x => x.id === id);
 const memoIn = pid => st.memo.filter(x => x.parent === pid);
 const memoName = m => m.name || ("名前のない" + (m.kind === "folder" ? "フォルダ" : m.kind === "image" ? "画像" : "メモ"));
-const isShut = m => !!m.lock && !opened.has(m.id);   // 鍵がかかっていて、まだ開けていない
+const isShut = m => !!m.hide && !unlocked;   // 隠してあって、まだ合言葉を通していない
 
 function renderMemo() {
   const here = memoAt ? memoOf(memoAt) : null;
@@ -755,7 +763,7 @@ function renderMemo() {
 
   // 中身が同じなら作り直さない。毎分の画面更新で画像を読み直さないため。
   const sig = memoAt + "|" + sorted.map(m =>
-    [m.id, m.kind, m.name, m.body.slice(0, 40), m.lock ? 1 : 0, isShut(m) ? 1 : 0,
+    [m.id, m.kind, m.name, m.body.slice(0, 40), m.hide ? 1 : 0, isShut(m) ? 1 : 0,
      m.kind === "folder" ? memoIn(m.id).length : ""].join(",")).join(";");
   if (sig === memoSig && $("#memoList").children.length) return;
   memoSig = sig;
@@ -766,10 +774,13 @@ function renderMemo() {
       : m.kind === "folder" ? '<div class="mbody">' + memoIn(m.id).length + "件</div>"
       : m.kind === "note" && m.body ? '<div class="mbody">' + esc(m.body) + "</div>"
       : "";
+    // 隠してあるフォルダは、開けているあいだも鍵つきの形のままにする（うっかり置き忘れ防止）
+    const ico = m.hide && m.kind === "folder" ? ICO_HFOLDER
+      : shut ? ICO_LOCK
+      : m.kind === "folder" ? ICO_FOLDER : ICO_NOTE;
     const head = m.kind === "image" && !shut
       ? '<span class="mthumb" data-th="' + esc(m.id) + '"></span>'
-      : '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' +
-        (shut ? ICO_LOCK : m.kind === "folder" ? ICO_FOLDER : ICO_NOTE) + "</span>";
+      : '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' + ico + "</span>";
     return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' + head +
       '<div class="rowbody"><div class="rowtitle">' + esc(memoName(m)) + "</div>" + sub +
       "</div></div>";
@@ -798,12 +809,14 @@ function paintThumbs() {
 
 /* 編集の窓を開く。folder のときは本文の欄を出さない。 */
 function openMemoEdit(kind, id) {
-  mEditKind = kind; mEditing = id || null;
+  mEditKind = kind; mEditing = id || null;   // kind は "folder" / "hidden" / "note" / "image"
   const m = id ? memoOf(id) : null;
-  $("#mmHead").textContent = (kind === "folder" ? "フォルダ" : "メモ") + (m ? "" : "を作る");
+  const isFolder = kind === "folder" || kind === "hidden";
+  $("#mmHead").textContent =
+    (kind === "hidden" ? "非表示フォルダ" : isFolder ? "フォルダ" : "メモ") + (m ? "" : "を作る");
   $("#mmName").value = m ? m.name : "";
   $("#mmBody").value = m && m.kind !== "folder" ? m.body : "";
-  $("#mmBodyWrap").hidden = kind === "folder";
+  $("#mmBodyWrap").hidden = isFolder;
   openSheet("#sheetMEdit");
   if (!m) setTimeout(() => $("#mmName").focus(), 60);
 }
@@ -811,8 +824,12 @@ $("#memoAdd").addEventListener("click", () => openSheet("#sheetMAdd"));
 $("#sheetMAdd").addEventListener("click", e => {
   const b = e.target.closest("[data-add]"); if (!b) return;
   closeSheet("#sheetMAdd");
-  if (b.dataset.add === "image") $("#memoFile").click();
-  else openMemoEdit(b.dataset.add, null);
+  if (b.dataset.add === "image") { $("#memoFile").click(); return; }
+  if (b.dataset.add === "hidden") {                    // 中身をまとめて隠す入れ物
+    if (!st.pass) { openPass(() => openMemoEdit("hidden", null)); return; }   // 先に合言葉を決める
+    openMemoEdit("hidden", null); return;
+  }
+  openMemoEdit(b.dataset.add, null);
 });
 /* えらばれた写真を物置へ入れ、一覧に1件足す。名前はファイル名から。 */
 $("#memoFile").addEventListener("change", e => {
@@ -825,7 +842,7 @@ $("#memoFile").addEventListener("change", e => {
     .then(th => Promise.all([filePut("img-" + id, f), th && filePut("th-" + id, th)]))
     .then(() => {
       st.memo.push({ id: id, kind: "image", name: f.name.replace(/\.[^.]+$/, "").slice(0, 120),
-                     body: "", parent: memoAt, at: keyOf(new Date()), lock: "" });
+                     body: "", parent: memoAt, at: keyOf(new Date()), hide: false });
       save(); memoSig = ""; renderMemo(); setMsg("入れました");
     })
     .catch(() => setMsg("取りこめませんでした"));
@@ -837,13 +854,14 @@ $("#memoBack").addEventListener("click", () => {
 });
 $("#mmCancel").addEventListener("click", () => closeSheet("#sheetMEdit"));
 $("#mmSave").addEventListener("click", () => {
+  const isFolder = mEditKind === "folder" || mEditKind === "hidden";
   const name = $("#mmName").value.trim();
-  const body = mEditKind === "folder" ? "" : $("#mmBody").value;
+  const body = isFolder ? "" : $("#mmBody").value;
   if (!name && !body) return;                          // どちらも空なら何もしない
   const target = mEditing && memoOf(mEditing);
   if (target) { target.name = name; if (target.kind !== "folder") target.body = body; }
-  else st.memo.push({ id: uid(), kind: mEditKind, name: name, body: body,
-                      parent: memoAt, at: keyOf(new Date()) });
+  else st.memo.push({ id: uid(), kind: isFolder ? "folder" : mEditKind, name: name, body: body,
+                      parent: memoAt, at: keyOf(new Date()), hide: mEditKind === "hidden" });
   save(); memoSig = ""; renderMemo(); closeSheet("#sheetMEdit");
 });
 
@@ -852,7 +870,7 @@ $("#memoList").addEventListener("click", e => {
   const b = e.target.closest("[data-act='mopen']"); if (!b) return;
   if (Date.now() - mHoldEnd < HOLD_EAT) return;        // 長押し直後の一押しは飲みこむ
   const m = memoOf(b.dataset.id); if (!m) return;
-  if (isShut(m)) { askWord(m.id); return; }            // 鍵がかかっていれば、まず合言葉
+  if (isShut(m)) { askWord(() => openMemoItem(m)); return; }   // 隠してあれば、まず合言葉
   openMemoItem(m);
 });
 function openMemoItem(m) {
@@ -899,52 +917,76 @@ function openMemoMenu(id) {
   mMenuFor = id; mDelArm = false;
   $("#miHead").textContent = m.name || (m.kind === "folder" ? "名前のないフォルダ" : "名前のないメモ");
   $("#miDelete").textContent = "削除";
+  $("#miLock").textContent = m.hide ? "隠すのをやめる" : "隠す";
   openSheet("#sheetMItem");
 }
-/* 閲覧制限（かくすだけ）。合言葉はそのまま保存されるので、
-   バックアップの文字列を見られたら中身も合言葉も分かる。人目よけの錠前。 */
+/* 隠す／隠さない。合言葉はアプリに1つ（st.pass）なので、ここでは印を付けるだけ。
+   まだ合言葉が無いときは、先に決めてもらう。 */
 $("#miLock").addEventListener("click", () => {
   const m = memoOf(mMenuFor); if (!m) return;
   closeSheet("#sheetMItem");
-  $("#mlWord").value = m.lock || "";
-  openSheet("#sheetMLock");
-  setTimeout(() => $("#mlWord").focus(), 60);
-});
-$("#mlOn").addEventListener("click", () => {
-  const m = memoOf(mMenuFor); if (!m) return;
-  const w = $("#mlWord").value.trim();
-  if (!w) { setMsg("合言葉を入れてください", true); return; }
-  m.lock = w; opened.add(m.id);              // かけた直後は開いたままにしておく
-  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
-  setMsg("閲覧制限をかけました");
-});
-$("#mlOff").addEventListener("click", () => {
-  const m = memoOf(mMenuFor); if (!m) return;
-  m.lock = ""; opened.delete(m.id);
-  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
-  setMsg("閲覧制限をはずしました");
+  if (m.hide) {                                // 隠すのをやめる
+    m.hide = false; save(); memoSig = ""; renderMemo(); setMsg("隠すのをやめました");
+    return;
+  }
+  const go = () => {
+    m.hide = true; unlocked = false;           // かけたら、その場で隠れる（かかったことが見て分かる）
+    save(); memoSig = ""; renderMemo(); setMsg("隠しました");
+  };
+  if (!st.pass) openPass(go); else go();
 });
 
-/* 合言葉を聞く。合っていれば、このアプリを閉じるまでは開いたままにする。 */
-let askFor = null;
-function askWord(id) {
-  const m = memoOf(id); if (!m) return;
-  askFor = id;
-  $("#moHead").textContent = memoName(m);
+/* 合言葉を決める・変える。変えるときは、いまの合言葉が要る。 */
+let passThen = null;
+function openPass(then) {
+  passThen = then || null;
+  const has = !!st.pass;
+  $("#mlHead").textContent = has ? "合言葉を変える" : "合言葉を決める";
+  $("#mlOldWrap").hidden = !has;
+  $("#mlNewLab").textContent = has ? "新しい合言葉" : "合言葉";
+  $("#mlOld").value = ""; $("#mlWord").value = ""; $("#mlNg").hidden = true;
+  $("#mlOn").textContent = has ? "変える" : "決める";
+  openSheet("#sheetMLock");
+  setTimeout(() => (has ? $("#mlOld") : $("#mlWord")).focus(), 60);
+}
+$("#mlCancel").addEventListener("click", () => { passThen = null; closeSheet("#sheetMLock"); });
+$("#mlOn").addEventListener("click", () => {
+  const w = $("#mlWord").value.trim();
+  if (st.pass && $("#mlOld").value.trim() !== st.pass) { $("#mlNg").hidden = false; return; }
+  if (!w) { setMsg("合言葉を入れてください", true); return; }
+  const first = !st.pass;
+  st.pass = w; unlocked = true;                // 決めた本人は、そのまま見られる
+  save(); paintPass(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
+  setMsg(first ? "合言葉を決めました" : "合言葉を変えました");
+  const f = passThen; passThen = null; if (f) f();
+});
+$("#mlWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#mlOn").click(); });
+
+/* 合言葉を聞く。合っていれば、隠してあるものが「まとめて」見えるようになる。 */
+let askThen = null;
+function askWord(then) {
+  askThen = then || null;
+  $("#moHead").textContent = "合言葉";
   $("#moWord").value = ""; $("#moNg").hidden = true;
   openSheet("#sheetMOpen");
   setTimeout(() => $("#moWord").focus(), 60);
 }
-$("#moCancel").addEventListener("click", () => closeSheet("#sheetMOpen"));
+$("#moCancel").addEventListener("click", () => { askThen = null; closeSheet("#sheetMOpen"); });
 $("#moOk").addEventListener("click", () => {
-  const m = memoOf(askFor); if (!m) return;
-  if ($("#moWord").value.trim() !== m.lock) { $("#moNg").hidden = false; return; }
-  opened.add(m.id);
+  if ($("#moWord").value.trim() !== st.pass) { $("#moNg").hidden = false; return; }
+  unlocked = true;
   closeSheet("#sheetMOpen");
   memoSig = ""; renderMemo();
-  openMemoItem(m);
+  const f = askThen; askThen = null; if (f) f();
 });
 $("#moWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#moOk").click(); });
+
+/* 設定画面の「書庫の合言葉」 */
+function paintPass() {
+  $("#passState").textContent = st.pass ? "決めてあります" : "まだ決めていません";
+  $("#passBtn").textContent = st.pass ? "合言葉を変える" : "合言葉を決める";
+}
+$("#passBtn").addEventListener("click", () => openPass(null));
 
 $("#miRename").addEventListener("click", () => {
   const m = memoOf(mMenuFor); if (!m) return;
@@ -1522,7 +1564,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") { paintBackup(); paintNotify(); }
+  if (t.dataset.v === "set") { paintBackup(); paintNotify(); paintPass(); }
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
@@ -1889,6 +1931,7 @@ if (window.matchMedia) {
 
 /* ---------- boot ---------- */
 applyTheme();
+paintPass();
 mirror();
 paintNotify();
 if (canNotify()) syncPings().catch(() => {});
@@ -1901,7 +1944,15 @@ setInterval(() => {
   updateSpeech(new Date());
   render();
 }, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { updateSpeech(new Date()); render(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    // ほかのアプリへ移った・画面を消した＝ここが「閉じた」。開けてあった鍵はかけ直す。
+    // iPhoneのホーム画面アプリは切りかえても動いたままなので、ここで戻さないと開きっぱなしになる。
+    unlocked = false; memoSig = "";
+    return;
+  }
+  updateSpeech(new Date()); render();
+});
 
 /* ---------- service worker ---------- */
 /* オフラインで開けるようにする。file: で直接開いたときは働かないので何もしない。 */
