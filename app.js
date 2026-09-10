@@ -1756,7 +1756,7 @@ $("#rmSave").addEventListener("click", () => {
   if (rmDraft.rule === "week" && !rmDraft.days.length) { setMsg("曜日をえらんでください", true); return; }
   const i = st.reminders.findIndex(x => x.id === rmEditing);
   if (i >= 0) st.reminders[i] = rmDraft; else st.reminders.push(rmDraft);
-  save(); renderRem(); closeSheet("#sheetRem");
+  save(); syncNow(); renderRem(); closeSheet("#sheetRem");
   setMsg(i >= 0 ? "変えました" : "追加しました");
 });
 let rmDelArm = false;
@@ -1889,9 +1889,11 @@ function paintNotify() {
   tog.setAttribute("aria-checked", on ? "true" : "false");
   lab.textContent = on ? "オン" : "オフ";
   msg.textContent = stop || (on
-    ? "いまはテスト通知だけ出せます。予定にあわせた通知はこれから作ります。"
+    ? "予定とくりかえし通知を、時間になったら知らせます。"
     : "オンにすると、端末が一度だけ許可をたずねます。");
   test.hidden = !on;
+  $("#notifyTest2").hidden = !on;
+  paintPingLog();
 }
 $("#notifyTog").addEventListener("click", async () => {
   if ($("#notifyTog").disabled) return;
@@ -1923,6 +1925,16 @@ const swReady = () => Promise.race([
   navigator.serviceWorker.ready,
   new Promise((ok, no) => setTimeout(() => no(new Error("まだ支度ができていません")), 4000))
 ]);
+$("#notifyTest2").addEventListener("click", async () => {
+  testAt = Date.now() + 60 * 1000;
+  $("#notifyTest2").disabled = true;
+  const n = await syncNow();
+  const g = readPingLog();
+  if (g && g.err) { $("#notifyTest2").disabled = false; testAt = 0; setMsg("サーバーへ送れませんでした", true); return; }
+  setMsg("1分後に鳴らします。アプリを閉じて待ってみてください。");
+  setTimeout(() => { $("#notifyTest2").disabled = false; testAt = 0; }, 90 * 1000);
+  return n;
+});
 $("#notifyTest").addEventListener("click", async () => {
   try {
     const reg = await swReady();
@@ -2019,6 +2031,25 @@ function remNext(r, now) {
   return remDays(r, new Date(t)).find(d => d.getTime() > t) || null;
 }
 
+/* サーバーへ送った状況。この端末だけのことなので、バックアップ（st）には入れない。
+   失敗しても前は何も出なかったので、ここに残して通知画面に見せる。 */
+const PING_LOG = "celestia-ping-log";
+function readPingLog() { try { return JSON.parse(localStorage.getItem(PING_LOG) || "null"); } catch (e) { return null; } }
+function writePingLog(v) { try { localStorage.setItem(PING_LOG, JSON.stringify(v)); } catch (e) {} paintPingLog(); }
+const whenText = d => (d.getMonth() + 1) + "/" + d.getDate() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+function paintPingLog() {
+  const el = $("#pingState"); if (!el) return;
+  const g = readPingLog();
+  if (!canNotify()) { el.textContent = ""; return; }
+  if (!g) { el.textContent = "まだサーバーへ送っていません。"; return; }
+  if (g.err) { el.textContent = "送れませんでした（" + whenText(new Date(g.at)) + "）。電波のあるところで開き直すと、もう一度送ります。"; return; }
+  el.textContent = g.n
+    ? "サーバーに" + g.n + "件あずけています。次は " + whenText(new Date(g.next)) + "（送ったのは " + whenText(new Date(g.at)) + "）"
+    : "いま鳴らす予定はありません（送ったのは " + whenText(new Date(g.at)) + "）";
+}
+/* サーバーを通して1分後に鳴らす試し。端末→サーバー→通知の全部を通る。 */
+let testAt = 0;
+
 /* 鳴らす予定を置き直す。送るのは番号・日付・時刻だけで、名前は送らない。
    過ぎたものは送らない。多すぎるときは近い順に200件まで。 */
 async function syncPings() {
@@ -2036,17 +2067,27 @@ async function syncPings() {
         day_key: keyOf(d), fire_at: d.toISOString() });
     });
   });
+  if (testAt > now) rows.push({ owner: owner, event_id: "test-" + testAt,
+    day_key: keyOf(new Date(testAt)), fire_at: new Date(testAt).toISOString() });
   rows.sort((a, b) => a.fire_at.localeCompare(b.fire_at));
+  const send = rows.slice(0, 200);
   await sbWrite("pings?owner=eq." + owner, "DELETE");
-  if (rows.length) await sbWrite("pings", "POST", rows.slice(0, 200));
-  return rows.length;
+  if (send.length) await sbWrite("pings", "POST", send);
+  writePingLog({ at: Date.now(), n: send.length, next: send[0] ? send[0].fire_at : "" });
+  return send.length;
+}
+/* いますぐ送る。失敗は捨てずに記録する。 */
+function syncNow() {
+  clearTimeout(pingTimer); pingTimer = null;
+  if (!canNotify()) return Promise.resolve(0);
+  return syncPings().catch(e => { writePingLog({ at: Date.now(), err: String(e && e.message || e) }); return 0; });
 }
 /* 保存のたびに呼ばれる。まとめて少し待ってから送る（打つたびに通信しないため）。 */
 let pingTimer = null;
 function pingsLater() {
   if (!canNotify()) return;
   clearTimeout(pingTimer);
-  pingTimer = setTimeout(() => { syncPings().catch(() => {}); }, 2000);
+  pingTimer = setTimeout(syncNow, 2000);
 }
 
 /* 通知の宛先をサーバーに預ける（オンにしたとき） */
@@ -2095,7 +2136,7 @@ paintPass();
 renderRem();
 mirror();
 paintNotify();
-if (canNotify()) syncPings().catch(() => {});
+syncNow();
 updateSpeech(new Date());
 render();
 let lastDay = keyOf(new Date());
@@ -2113,6 +2154,7 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
   updateSpeech(new Date()); render();
+  syncNow();   // 戻ってきたら、端末の中身とサーバーを合わせ直す（離れる前の送り損ねもここで拾う）
 });
 
 /* ---------- service worker ---------- */

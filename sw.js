@@ -59,6 +59,8 @@ async function stateNow() {
   } catch (e) { return null; }
 }
 async function buildNotice(d) {
+  // 通知画面の「1分後に鳴らす」から来た試し
+  if (String(d.id || "").startsWith("test-")) return { title: "セレスティア", body: "試しの通知だ。ちゃんと届いているぞ。" };
   const st = await stateNow();
   const list = st && st.events && st.events[d.k];
   // 予定に無ければ、くりかえし通知のほうを見る（どちらも控えの中にある）
