@@ -9,6 +9,9 @@
   --r:14px;
   /* セリフ枠の最低の高さ（3行ぶん＋上下の余白）。絵の下にあける場所もこれに合わせる。 */
   --speech-h:117px;
+  /* 下タブのホームの丸が、線より上に出ているぶん。中身の下の余白はこのぶん足してある。
+     丸の大きさ（.homeorb）を変えたら、ここも合わせる。 */
+  --orb-rise:16px;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -153,6 +156,7 @@ main{
   overflow-y:auto;overscroll-behavior:contain;
   scrollbar-gutter:stable both-edges;
   padding:16px;
+  padding-bottom:calc(16px + var(--orb-rise));   /* いちばん下まで転がしても、ホームの丸にかからない */
 }
 /* ホームは全身の絵を上下に転がして見る場所なので、バーは見せない（転がすことはできる）。
    消すのは見た目だけで、場所取りは残す。消してしまうと、ほかのタブと左右の幅がずれる。 */
@@ -166,7 +170,7 @@ main.on-home .scroller::-webkit-scrollbar-thumb{background:transparent}
    セリフは下タブのすぐ上に貼り付けるので、ここに残るのは絵だけ。
    あいだが空くのは、そこを埋める絵が入るまでの姿
    （絵を大きくしたいときは .portrait の max-height を上げる）。 */
-#v-home{padding-bottom:calc(var(--speech-h) + 12px)}   /* セリフの場所をあけておく */
+#v-home{padding-bottom:calc(var(--speech-h) + 12px + var(--orb-rise))}   /* セリフの場所をあけておく */
 .stage{display:flex;flex-direction:column;gap:12px;flex:1}
 
 /* ホームのときだけ出るもの。ほかのタブでは、それぞれの display に戻さずここでしまう。 */
@@ -177,6 +181,7 @@ main:not(.on-home) .homeonly{display:none}
    何も無いところは後ろを触れるように、当たり判定は中の要素だけにする。 */
 .overlay{
   position:absolute;inset:0;padding:16px;
+  padding-bottom:calc(16px + var(--orb-rise));   /* セリフをホームの丸より上に置く */
   overflow:hidden;scrollbar-gutter:stable both-edges;
   display:flex;flex-direction:column;
   pointer-events:none;
@@ -455,16 +460,39 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 /* 下タブは箱のいちばん下の段。画面には貼りつけていない（body の説明を見よ）。 */
 .nav{
   flex:none;
+  position:relative;z-index:30;   /* 浮かせたホームの丸が、上の中身より手前に来るように */
   background:var(--bg);
   background:color-mix(in srgb,var(--bg) 90%,transparent);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line);
   padding:6px 0 calc(env(safe-area-inset-bottom) + 6px);
 }
-.navin{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
+/* 7つ並べて、ホームをまんなか（4つめ）に置く。数を変えるときは奇数のままにする。 */
+.navin{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(7,1fr)}
 .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--ink3);font-size:10px;letter-spacing:.04em;white-space:nowrap}
 .tab svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--dawn)}
+/* 幅の狭い端末では「カレンダー」が隣にはみ出すので、字の間を詰める */
+@media (max-width:370px){.tab{letter-spacing:0}}
+
+/* ホームだけは丸い台に載せて、下タブの線から --orb-rise だけ上に浮かせる。
+   ほかのタブのアイコン（21px）より大きいぶんを上へ逃がすので、文字の高さはそろったまま。
+   まわりに背景色の縁を付けて、線が丸を避けて通っているように見せる。 */
+.homeorb{
+  width:48px;height:48px;border-radius:50%;flex:none;
+  margin-top:calc(21px - 48px);
+  display:grid;place-items:center;
+  background:var(--bg3);border:1px solid var(--line);color:var(--ink2);
+  box-shadow:0 0 0 4px var(--bg),0 4px 14px rgba(10,8,20,.35);
+  transition:transform .12s ease,background .2s ease,color .2s ease;
+}
+.tab .homeorb svg{width:24px;height:24px;stroke-width:1.8}
+.tab.home:active .homeorb{transform:scale(.93)}
+.tab.home.on .homeorb{
+  border-color:transparent;color:var(--bg);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--dawn) 70%,#fff),var(--dawn));
+  box-shadow:0 0 0 4px var(--bg),0 4px 18px color-mix(in srgb,var(--dawn) 45%,transparent);
+}
 
 #mFree{display:flex;flex-direction:column;gap:13px}
 .pill .pexp{margin-left:6px;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
