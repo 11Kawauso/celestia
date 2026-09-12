@@ -154,6 +154,10 @@ main{
   scrollbar-gutter:stable both-edges;
   padding:16px;
 }
+/* ホームは全身の絵を上下に転がして見る場所なので、バーは見せない（転がすことはできる）。
+   消すのは見た目だけで、場所取りは残す。消してしまうと、ほかのタブと左右の幅がずれる。 */
+main.on-home .scroller{scrollbar-color:transparent transparent}
+main.on-home .scroller::-webkit-scrollbar-thumb{background:transparent}
 .view{display:none;flex-direction:column;gap:18px}
 .view.on{display:flex;flex:1 0 auto}   /* 縦いっぱいに広げる。中身が長ければそのぶん伸びる */
 
