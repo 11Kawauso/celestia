@@ -25,7 +25,7 @@ function seed() {
     missions: [
       wakeMission(uid(), WAKE_DEFAULT)
     ],
-    goals: [], memo: [], pass: "", reminders: [],
+    goals: [], memo: [], reminders: [],
     events: {}, log: {}, theme: "auto", notify: false
   };
 }
@@ -108,27 +108,14 @@ function normalize(o) {
     };
   });
 
-  /* メモ。フォルダも中身も同じ1本の配列で持ち、parent でぶら下がりを表す。
-     こうしておくと、あとで移動や入れ子を足すときに形を変えずに済む。 */
-  let oldWord = "";                    // 昔の形（項目ごとのパスワード）から引き継ぐ用
-  o.memo = asArr(o.memo).map(x => {
-    const m = asObj(x);
-    const w = asStr(m.lock);           // 昔の形。いまは項目ごとに持たない
-    if (w && !oldWord) oldWord = w;
-    return {
-      id: asStr(m.id) || uid(),
-      kind: ["folder", "note", "image"].includes(m.kind) ? m.kind : "note",
-      name: asStr(m.name).slice(0, 120),
-      body: asStr(m.body),
-      parent: asStr(m.parent),
-      at: asDate(m.at),
-      hide: !!m.hide || !!w            // 隠すかどうか。パスワードはアプリに1つ（o.pass）
-    };
-  });
-  // パスワードはアプリで1つ。昔の控えから来たときは、最初に見つけたものを引き継ぐ。
-  o.pass = (asStr(o.pass) || oldWord).slice(0, 60);
-  // 親が消えているものは、いちばん上に戻す（迷子を作らない）
-  o.memo.forEach(m => { if (m.parent && !o.memo.some(x => x.kind === "folder" && x.id === m.parent)) m.parent = ""; });
+  /* メモ。タイトルと本文だけ。足した順に並べて持つ。
+     昔の書庫にあったフォルダと画像は捨て、フォルダの中にあったメモは一覧にそのまま並べる。 */
+  o.memo = asArr(o.memo).map(asObj).filter(m => !m.kind || m.kind === "note").map(m => ({
+    id: asStr(m.id) || uid(),
+    name: asStr(m.name).slice(0, 120),
+    body: asStr(m.body),
+    at: asDate(m.at)
+  }));
 
   /* くりかえし通知。予定と違って日付を持たず、決まりだけを持つ。
      rule は "daily"（毎日）／"every"（n日おき、from が起点）／"week"（曜日えらび）。 */
@@ -173,7 +160,7 @@ function normalize(o) {
 
   o.notify = !!o.notify;      // 通知を使うか（端末の許可とは別に、こちらでも持つ）
   o.v = 2;
-  delete o.todos; delete o.help;
+  delete o.todos; delete o.help; delete o.pass;   // pass は昔の書庫のパスワード
   return o;
 }
 
@@ -800,335 +787,56 @@ $("#recBars").addEventListener("pointerleave", e => {
 $("#recPrev").addEventListener("click", () => { recOff += 7; recSel = null; renderRec(); });
 $("#recNext").addEventListener("click", () => { recOff = Math.max(0, recOff - 7); recSel = null; renderRec(); });
 
-/* ---------- 画像の物置 ---------- */
-/* 画像の本体だけは IndexedDB に置く。JSONの保存場所（localStorage）は5MBほどしかなく、
-   写真1枚で使い切ってしまうため。メモ側は「どの画像か」の目印だけを持つ。
-   そのため、設定画面のバックアップ文字列に画像は入らない。 */
-const DB_NAME = "celestia-files", DB_STORE = "blobs";
-let dbP = null;
-function fileDB() {
-  if (!dbP) dbP = new Promise((ok, ng) => {
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = () => {
-      if (!r.result.objectStoreNames.contains(DB_STORE)) r.result.createObjectStore(DB_STORE);
-    };
-    r.onsuccess = () => ok(r.result);
-    r.onerror = () => ng(r.error);
-  });
-  return dbP;
-}
-function fileDo(mode, fn) {
-  return fileDB().then(d => new Promise((ok, ng) => {
-    const tx = d.transaction(DB_STORE, mode), req = fn(tx.objectStore(DB_STORE));
-    tx.oncomplete = () => ok(req ? req.result : undefined);
-    tx.onerror = () => ng(tx.error);
-  })).catch(() => null);
-}
-const fileGet = k => fileDo("readonly", s => s.get(k));
-const filePut = (k, v) => fileDo("readwrite", s => s.put(v, k));
-const fileDel = k => fileDo("readwrite", s => s.delete(k));
-
-/* 一覧に出すための小さい画像を焼く。元の写真は大きいので、
-   そのまま並べると読みこみも記憶も重くなる。 */
-function makeThumb(file, max) {
-  return new Promise(ok => {
-    const url = URL.createObjectURL(file), img = new Image();
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.max(1, Math.round(img.width * s));
-      c.height = Math.max(1, Math.round(img.height * s));
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      c.toBlob(b => ok(b || file), "image/jpeg", 0.8);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); ok(null); };
-    img.src = url;
-  });
-}
-
 /* ---------- メモ ---------- */
-/* フォルダとメモを、ひとつの配列に parent でぶら下げて持つ。
-   いま開いているフォルダは memoAt（空文字＝いちばん上）。 */
-let memoAt = "", mEditing = null, mEditKind = "note", mMenuFor = null, mDelArm = false;
-let memoSig = "", thumbUrls = [];
-let unlocked = false;              // パスワードを通したか。アプリを離れると false に戻す（下の visibilitychange）
-const ICO_FOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/></svg>';
+/* タイトルと本文だけのメモ。押すと編集の窓が開き、消すのもその窓から。 */
+let mEditing = null, mDelArm = false;
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
-const ICO_LOCK = '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>';
-/* 非表示フォルダ。フォルダの形の真ん中に、小さな鍵穴を置く。 */
-const ICO_HFOLDER = '<svg viewBox="0 0 24 24"><path d="M3.5 6.5h5.5l2 2.5h9.5v10.5h-17z"/>' +
-  '<circle cx="12" cy="13.5" r="1.7"/><path d="M12 15.2v2"/></svg>';
 const memoOf = id => st.memo.find(x => x.id === id);
-const memoIn = pid => st.memo.filter(x => x.parent === pid);
-const memoName = m => m.name || ("名前のない" + (m.kind === "folder" ? "フォルダ" : m.kind === "image" ? "画像" : "メモ"));
-const isShut = m => !!m.hide && !unlocked;   // 隠してあって、まだパスワードを通していない
 
 function renderMemo() {
-  const here = memoAt ? memoOf(memoAt) : null;
-  if (memoAt && !here) memoAt = "";                    // 開いていたフォルダが消えていたら上へ戻す
-  $("#memoWhere").textContent = here ? memoName(here) : "書庫";
-  $("#memoBack").hidden = !memoAt;
-
-  // フォルダが先、それぞれ新しいものが上
-  const list = memoIn(memoAt);
-  const sorted = list.slice().sort((a, b) =>
-    (a.kind === "folder" ? 0 : 1) - (b.kind === "folder" ? 0 : 1) ||
-    (b.at || "").localeCompare(a.at || ""));
-
-  // 中身が同じなら作り直さない。毎分の画面更新で画像を読み直さないため。
-  const sig = memoAt + "|" + sorted.map(m =>
-    [m.id, m.kind, m.name, m.body.slice(0, 40), m.hide ? 1 : 0, isShut(m) ? 1 : 0,
-     m.kind === "folder" ? memoIn(m.id).length : ""].join(",")).join(";");
-  if (sig === memoSig && $("#memoList").children.length) return;
-  memoSig = sig;
-
-  $("#memoList").innerHTML = sorted.length ? sorted.map(m => {
-    const shut = isShut(m);
-    const sub = shut ? '<div class="mlock">パスワードで見られます</div>'
-      : m.kind === "folder" ? '<div class="mbody">' + memoIn(m.id).length + "件</div>"
-      : m.kind === "note" && m.body ? '<div class="mbody">' + esc(m.body) + "</div>"
-      : "";
-    // 隠してあるフォルダは、開けているあいだも鍵つきの形のままにする（うっかり置き忘れ防止）
-    const ico = m.hide && m.kind === "folder" ? ICO_HFOLDER
-      : shut ? ICO_LOCK
-      : m.kind === "folder" ? ICO_FOLDER : ICO_NOTE;
-    const head = m.kind === "image" && !shut
-      ? '<span class="mthumb" data-th="' + esc(m.id) + '"></span>'
-      : '<span class="mico ' + (m.kind === "folder" ? "folder" : "") + '">' + ico + "</span>";
-    return '<div class="row" data-act="mopen" data-id="' + esc(m.id) + '">' + head +
-      '<div class="rowbody"><div class="rowtitle">' + esc(memoName(m)) + "</div>" + sub +
-      "</div></div>";
-  }).join("") : '<div class="empty">まだ何もありません。</div>';
-  $("#memoList").style.display = "flex";
-  $("#memoList").style.flexDirection = "column";
-  $("#memoList").style.gap = "10px";
-  paintThumbs();
+  const list = st.memo.slice().reverse();   // 足した順に持っているので、逆にすれば新しいものが上
+  $("#memoList").innerHTML = list.length ? list.map(m =>
+    '<div class="row" data-id="' + esc(m.id) + '">' +
+    '<span class="mico">' + ICO_NOTE + "</span>" +
+    '<div class="rowbody"><div class="rowtitle">' + esc(m.name || "名前のないメモ") + "</div>" +
+    (m.body ? '<div class="mbody">' + esc(m.body) + "</div>" : "") +
+    "</div></div>").join("") : '<div class="empty">まだメモはありません。</div>';
 }
 
-/* 一覧の画像を、物置から出して貼る。前に作った参照は捨てておく。 */
-function paintThumbs() {
-  thumbUrls.forEach(u => URL.revokeObjectURL(u));
-  thumbUrls = [];
-  $$("#memoList [data-th]").forEach(el => {
-    fileGet("th-" + el.dataset.th)
-      .then(b => b || fileGet("img-" + el.dataset.th))   // 小さいのが無ければ元の画像で
-      .then(b => {
-        if (!b || !el.isConnected) return;
-        const u = URL.createObjectURL(b);
-        thumbUrls.push(u);
-        el.style.backgroundImage = "url(" + u + ")";
-      });
-  });
-}
-
-/* 編集の窓を開く。folder のときは本文の欄を出さない。 */
-function openMemoEdit(kind, id) {
-  mEditKind = kind; mEditing = id || null;   // kind は "folder" / "hidden" / "note" / "image"
+function openMemoEdit(id) {
   const m = id ? memoOf(id) : null;
-  const isFolder = kind === "folder" || kind === "hidden";
-  $("#mmHead").textContent =
-    (kind === "hidden" ? "非表示フォルダ" : isFolder ? "フォルダ" : "メモ") + (m ? "" : "を作る");
+  mEditing = m ? m.id : null; mDelArm = false;
+  $("#mmHead").textContent = m ? "メモ" : "メモを書く";
   $("#mmName").value = m ? m.name : "";
-  $("#mmBody").value = m && m.kind !== "folder" ? m.body : "";
-  $("#mmBodyWrap").hidden = isFolder;
+  $("#mmBody").value = m ? m.body : "";
+  $("#mmDelete").hidden = !m;
+  $("#mmDelete").textContent = "このメモを消す";
   openSheet("#sheetMEdit");
   if (!m) setTimeout(() => $("#mmName").focus(), 60);
 }
-$("#memoAdd").addEventListener("click", () => openSheet("#sheetMAdd"));
-$("#sheetMAdd").addEventListener("click", e => {
-  const b = e.target.closest("[data-add]"); if (!b) return;
-  closeSheet("#sheetMAdd");
-  if (b.dataset.add === "image") { $("#memoFile").click(); return; }
-  if (b.dataset.add === "hidden") {                    // 中身をまとめて隠す入れ物
-    if (!st.pass) { openPass(() => openMemoEdit("hidden", null)); return; }   // 先にパスワードを決める
-    openMemoEdit("hidden", null); return;
-  }
-  openMemoEdit(b.dataset.add, null);
-});
-/* えらばれた写真を物置へ入れ、一覧に1件足す。名前はファイル名から。 */
-$("#memoFile").addEventListener("change", e => {
-  const f = e.target.files && e.target.files[0];
-  e.target.value = "";                                  // 同じ写真をもう一度えらべるように
-  if (!f) return;
-  const id = uid();
-  setMsg("画像を取りこんでいます…");
-  makeThumb(f, 320)
-    .then(th => Promise.all([filePut("img-" + id, f), th && filePut("th-" + id, th)]))
-    .then(() => {
-      st.memo.push({ id: id, kind: "image", name: f.name.replace(/\.[^.]+$/, "").slice(0, 120),
-                     body: "", parent: memoAt, at: keyOf(new Date()), hide: false });
-      save(); memoSig = ""; renderMemo(); setMsg("入れました");
-    })
-    .catch(() => setMsg("取りこめませんでした"));
-});
-$("#memoBack").addEventListener("click", () => {
-  const here = memoOf(memoAt);
-  memoAt = here ? here.parent : "";
-  memoSig = ""; renderMemo();
+$("#memoAdd").addEventListener("click", () => openMemoEdit(null));
+$("#memoList").addEventListener("click", e => {
+  const r = e.target.closest(".row[data-id]"); if (r) openMemoEdit(r.dataset.id);
 });
 $("#mmCancel").addEventListener("click", () => closeSheet("#sheetMEdit"));
 $("#mmSave").addEventListener("click", () => {
-  const isFolder = mEditKind === "folder" || mEditKind === "hidden";
-  const name = $("#mmName").value.trim();
-  const body = isFolder ? "" : $("#mmBody").value;
+  const name = $("#mmName").value.trim(), body = $("#mmBody").value;
   if (!name && !body) return;                          // どちらも空なら何もしない
-  const target = mEditing && memoOf(mEditing);
-  if (target) { target.name = name; if (target.kind !== "folder") target.body = body; }
-  else st.memo.push({ id: uid(), kind: isFolder ? "folder" : mEditKind, name: name, body: body,
-                      parent: memoAt, at: keyOf(new Date()), hide: mEditKind === "hidden" });
-  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMEdit");
-});
-
-/* 一覧を押したとき。フォルダなら中へ、メモなら編集の窓へ。 */
-$("#memoList").addEventListener("click", e => {
-  const b = e.target.closest("[data-act='mopen']"); if (!b) return;
-  if (Date.now() - mHoldEnd < HOLD_EAT) return;        // 長押し直後の一押しは飲みこむ
-  const m = memoOf(b.dataset.id); if (!m) return;
-  if (isShut(m)) { askWord(() => openMemoItem(m)); return; }   // 隠してあれば、まずパスワード
-  openMemoItem(m);
-});
-function openMemoItem(m) {
-  if (m.kind === "folder") { memoAt = m.id; memoSig = ""; renderMemo(); }
-  else if (m.kind === "image") openMemoView(m.id);
-  else openMemoEdit("note", m.id);
-}
-/* 画像を大きく見る */
-let mvUrl = "";
-function openMemoView(id) {
-  const m = memoOf(id); if (!m) return;
-  $("#mvHead").textContent = memoName(m);
-  fileGet("img-" + id).then(b => {
-    if (mvUrl) URL.revokeObjectURL(mvUrl);
-    mvUrl = b ? URL.createObjectURL(b) : "";
-    $("#mvImg").src = mvUrl;
-    $("#mvImg").alt = memoName(m);
-    openSheet("#sheetMView");
-  });
-}
-$("#mvClose").addEventListener("click", () => closeSheet("#sheetMView"));
-
-/* 長押しで設定の窓。指がずれたら、なぞりとみなして取り消す。 */
-let mHoldT = null, mHoldFrom = null, mHoldEnd = 0;
-function mStopHold() { clearTimeout(mHoldT); mHoldT = null; mHoldFrom = null; }
-$("#memoList").addEventListener("pointerdown", e => {
-  const b = e.target.closest("[data-act='mopen']"); if (!b) return;
-  mHoldFrom = { x: e.clientX, y: e.clientY };
-  clearTimeout(mHoldT);
-  mHoldT = setTimeout(() => {
-    mHoldT = null; mHoldEnd = Date.now();
-    openMemoMenu(b.dataset.id);
-  }, HOLD_MS);
-});
-$("#memoList").addEventListener("pointermove", e => {
-  if (!mHoldT || !mHoldFrom) return;
-  if (Math.abs(e.clientX - mHoldFrom.x) > HOLD_SLOP ||
-      Math.abs(e.clientY - mHoldFrom.y) > HOLD_SLOP) mStopHold();
-});
-["pointerup", "pointercancel"].forEach(t => $("#memoList").addEventListener(t, mStopHold));
-
-function openMemoMenu(id) {
-  const m = memoOf(id); if (!m) return;
-  mMenuFor = id; mDelArm = false;
-  $("#miHead").textContent = m.name || (m.kind === "folder" ? "名前のないフォルダ" : "名前のないメモ");
-  $("#miDelete").textContent = "削除";
-  $("#miLock").textContent = m.hide ? "隠すのをやめる" : "隠す";
-  openSheet("#sheetMItem");
-}
-/* 隠す／隠さない。パスワードはアプリに1つ（st.pass）なので、ここでは印を付けるだけ。
-   まだパスワードが無いときは、先に決めてもらう。 */
-$("#miLock").addEventListener("click", () => {
-  const m = memoOf(mMenuFor); if (!m) return;
-  closeSheet("#sheetMItem");
-  if (m.hide) {                                // 隠すのをやめる
-    m.hide = false; save(); memoSig = ""; renderMemo(); setMsg("隠すのをやめました");
-    return;
-  }
-  const go = () => {
-    m.hide = true; unlocked = false;           // かけたら、その場で隠れる（かかったことが見て分かる）
-    save(); memoSig = ""; renderMemo(); setMsg("隠しました");
-  };
-  if (!st.pass) openPass(go); else go();
-});
-
-/* パスワードを決める・変える。変えるときは、いまのパスワードが要る。 */
-let passThen = null;
-function openPass(then) {
-  passThen = then || null;
-  const has = !!st.pass;
-  $("#mlHead").textContent = has ? "パスワードを変える" : "パスワードを決める";
-  $("#mlOldWrap").hidden = !has;
-  $("#mlNewLab").textContent = has ? "新しいパスワード" : "パスワード";
-  $("#mlOld").value = ""; $("#mlWord").value = ""; $("#mlNg").hidden = true;
-  $("#mlOn").textContent = has ? "変える" : "決める";
-  openSheet("#sheetMLock");
-  setTimeout(() => (has ? $("#mlOld") : $("#mlWord")).focus(), 60);
-}
-$("#mlCancel").addEventListener("click", () => { passThen = null; closeSheet("#sheetMLock"); });
-$("#mlOn").addEventListener("click", () => {
-  const w = $("#mlWord").value.trim();
-  if (st.pass && $("#mlOld").value.trim() !== st.pass) { $("#mlNg").hidden = false; return; }
-  if (!w) { setMsg("パスワードを入れてください", true); return; }
-  const first = !st.pass;
-  st.pass = w; unlocked = true;                // 決めた本人は、そのまま見られる
-  save(); paintPass(); memoSig = ""; renderMemo(); closeSheet("#sheetMLock");
-  setMsg(first ? "パスワードを決めました" : "パスワードを変えました");
-  const f = passThen; passThen = null; if (f) f();
-});
-$("#mlWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#mlOn").click(); });
-
-/* パスワードを聞く。合っていれば、隠してあるものが「まとめて」見えるようになる。 */
-let askThen = null;
-function askWord(then) {
-  askThen = then || null;
-  $("#moHead").textContent = "パスワード";
-  $("#moWord").value = ""; $("#moNg").hidden = true;
-  openSheet("#sheetMOpen");
-  setTimeout(() => $("#moWord").focus(), 60);
-}
-$("#moCancel").addEventListener("click", () => { askThen = null; closeSheet("#sheetMOpen"); });
-$("#moOk").addEventListener("click", () => {
-  if ($("#moWord").value.trim() !== st.pass) { $("#moNg").hidden = false; return; }
-  unlocked = true;
-  closeSheet("#sheetMOpen");
-  memoSig = ""; renderMemo();
-  const f = askThen; askThen = null; if (f) f();
-});
-$("#moWord").addEventListener("keydown", e => { if (e.key === "Enter") $("#moOk").click(); });
-
-/* 設定画面の「書庫のパスワード」 */
-function paintPass() {
-  $("#passState").textContent = st.pass ? "決めてあります" : "まだ決めていません";
-  $("#passBtn").textContent = st.pass ? "パスワードを変える" : "パスワードを決める";
-}
-$("#passBtn").addEventListener("click", () => openPass(null));
-
-$("#miRename").addEventListener("click", () => {
-  const m = memoOf(mMenuFor); if (!m) return;
-  closeSheet("#sheetMItem");
-  openMemoEdit(m.kind, m.id);
+  const m = mEditing && memoOf(mEditing);
+  if (m) { m.name = name; m.body = body; }
+  else st.memo.push({ id: uid(), name: name, body: body, at: keyOf(new Date()) });
+  save(); renderMemo(); closeSheet("#sheetMEdit");
 });
 /* 消すのは二度押し。一度目は聞き返すだけ（アプリのほかの場所と同じやり方）。 */
-$("#miDelete").addEventListener("click", e => {
-  const m = memoOf(mMenuFor); if (!m) return;
-  // フォルダを消すときは、中身も一緒に消える
-  const gone = [m.id];
-  for (let i = 0; i < gone.length; i++)
-    st.memo.filter(x => x.parent === gone[i]).forEach(x => gone.push(x.id));
-  const n = gone.length - 1;
+$("#mmDelete").addEventListener("click", e => {
   if (!mDelArm) {
-    mDelArm = true;
-    e.target.textContent = (m.kind === "folder" && n ? "中の" + n + "件も消える。" : "") + "もう一度おす";
-    setTimeout(() => { if (mDelArm) { mDelArm = false; e.target.textContent = "削除"; } }, 3500);
+    mDelArm = true; e.target.textContent = "もう一度おすと消えます";
+    setTimeout(() => { if (mDelArm) { mDelArm = false; e.target.textContent = "このメモを消す"; } }, 3000);
     return;
   }
-  // 画像は物置のほうも消す（メモ側の目印だけ消しても、本体が残ってしまう）
-  st.memo.filter(x => gone.includes(x.id) && x.kind === "image")
-    .forEach(x => { fileDel("img-" + x.id); fileDel("th-" + x.id); });
-  st.memo = st.memo.filter(x => !gone.includes(x.id));
-  if (gone.includes(memoAt)) memoAt = "";
-  mDelArm = false; e.target.textContent = "削除";
-  save(); memoSig = ""; renderMemo(); closeSheet("#sheetMItem");
+  st.memo = st.memo.filter(x => x.id !== mEditing);
+  mDelArm = false;
+  save(); renderMemo(); closeSheet("#sheetMEdit");
 });
 
 /* ---------- sheets ---------- */
@@ -1683,7 +1391,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") { paintBackup(); paintPass(); }
+  if (t.dataset.v === "set") paintBackup();
   if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
   if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
 }));
@@ -2229,8 +1937,9 @@ if (window.matchMedia) {
 }
 
 /* ---------- boot ---------- */
+// 昔の書庫が画像を入れていた置き場。もう使わないので、残っていれば片づける
+try { if (window.indexedDB) indexedDB.deleteDatabase("celestia-files"); } catch (e) {}
 applyTheme();
-paintPass();
 renderRem();
 mirror();
 paintNotify();
@@ -2245,12 +1954,7 @@ setInterval(() => {
   render();
 }, 60000);
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    // ほかのアプリへ移った・画面を消した＝ここが「閉じた」。開けてあった鍵はかけ直す。
-    // iPhoneのホーム画面アプリは切りかえても動いたままなので、ここで戻さないと開きっぱなしになる。
-    unlocked = false; memoSig = "";
-    return;
-  }
+  if (document.hidden) return;
   updateSpeech(new Date()); render();
   syncNow();   // 戻ってきたら、端末の中身とサーバーを合わせ直す（離れる前の送り損ねもここで拾う）
 });
