@@ -488,10 +488,10 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 }
 .tab .homeorb svg{width:24px;height:24px;stroke-width:1.8}
 .tab.home:active .homeorb{transform:scale(.93)}
+/* 開いているときは、家と縁だけ金。中は紺のまま。 */
 .tab.home.on .homeorb{
-  border-color:transparent;color:var(--bg);
-  background:linear-gradient(145deg,color-mix(in srgb,var(--dawn) 70%,#fff),var(--dawn));
-  box-shadow:0 0 0 4px var(--bg),0 4px 18px color-mix(in srgb,var(--dawn) 45%,transparent);
+  border:2px solid var(--dawn);color:var(--dawn);
+  box-shadow:0 0 0 4px var(--bg),0 4px 18px color-mix(in srgb,var(--dawn) 35%,transparent);
 }
 
 #mFree{display:flex;flex-direction:column;gap:13px}
