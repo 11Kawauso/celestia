@@ -494,6 +494,38 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   box-shadow:0 0 0 4px var(--bg),0 4px 18px color-mix(in srgb,var(--dawn) 35%,transparent);
 }
 
+/* ---- 記録 ---- */
+.recstats{margin-top:0}
+.stat b small{font-size:11px;font-weight:500;color:var(--ink2);margin-left:2px}
+.recnav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.recrange{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.navb:disabled{opacity:.35;cursor:default}
+.recpick{font-size:12.5px;color:var(--ink3);text-align:center;font-variant-numeric:tabular-nums;min-height:1.6em}
+.recpick b{font-size:16px;font-weight:700;color:var(--ink);margin:0 2px}
+/* 棒グラフ。点線がいちばん上の目盛りで、その数を右上に書く。
+   棒どうしは2pxあけ、角を落とすのは上だけ（下は線に着ける）。 */
+.barsbox{position:relative;padding-top:15px}
+.bartop{position:absolute;right:0;top:0;font-size:10px;line-height:1;color:var(--ink3);font-variant-numeric:tabular-nums}
+.bars{
+  height:120px;display:flex;
+  border-top:1px dashed var(--line);border-bottom:1px solid var(--line);
+}
+/* 押せる範囲は棒の上の空きも含めた縦いっぱい。細い棒でも指で押しやすいように */
+.bar{flex:1;min-width:0;display:flex;align-items:flex-end;justify-content:center;padding:0 1px}
+.bar:disabled{cursor:default}
+.bar i{
+  display:block;width:100%;max-width:14px;min-height:2px;
+  background:var(--dawn);border-radius:4px 4px 0 0;transition:opacity .15s ease;
+}
+.bar i.zero{background:var(--line);border-radius:0}   /* 0回の日。始める前の日（何も無し）と見分けるため */
+.bars.picking .bar i{opacity:.35}
+.bars.picking .bar.sel i{opacity:1}
+.barx{position:relative;height:14px;margin-top:-6px}
+.barx span{
+  position:absolute;top:0;transform:translateX(-50%);
+  font-size:10px;line-height:14px;color:var(--ink3);white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+
 #mFree{display:flex;flex-direction:column;gap:13px}
 .pill .pexp{margin-left:6px;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 

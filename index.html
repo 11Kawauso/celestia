@@ -120,8 +120,29 @@
     <!-- RECORDS -->
     <section class="view" id="v-rec">
       <div class="card">
-        <div class="lab">記録・実績</div>
-        <div class="note">準備中です。達成したミッションの数や、続けた日数などをここに並べる予定です。</div>
+        <div class="lab">記録</div>
+        <div class="today recstats">
+          <div class="stat"><b id="r-days"></b><span>始めてから</span></div>
+          <div class="stat"><b id="r-wake"></b><span>早起き 連続</span></div>
+          <div class="stat"><b id="r-best"></b><span>早起き 最長</span></div>
+        </div>
+        <div class="note" id="r-since"></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">ミッション達成数</div>
+        <div class="recnav">
+          <button class="navb" id="recPrev" aria-label="前の週へ"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <div class="recrange" id="recRange"></div>
+          <button class="navb" id="recNext" aria-label="次の週へ"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+        <!-- 棒を押す（マウスなら乗せる）と、ここがその日の数に変わる -->
+        <div class="recpick" id="recPick" aria-live="polite"></div>
+        <div class="barsbox">
+          <span class="bartop" id="recTop"></span>
+          <div class="bars" id="recBars"></div>
+        </div>
+        <div class="barx" id="recX"></div>
       </div>
     </section>
 

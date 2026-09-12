@@ -6,6 +6,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const pad = n => String(n).padStart(2, "0");
 const keyOf = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const dayOf = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };   // keyOf の逆
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
@@ -164,19 +165,30 @@ function normalize(o) {
     if (list.length) o.log[k] = list;
   });
 
+  /* 始めた日。記録タブの「◯日目」の起点。
+     これを持っていない古いデータは、残っている記録のいちばん古い日を始めた日とみなす。 */
+  const seen = Object.keys(o.log).concat(o.memo.map(m => m.at), o.goals.map(g => g.doneAt))
+    .map(asDate).filter(Boolean);
+  o.since = asDate(o.since) || seen.concat(keyOf(new Date())).sort()[0];
+
   o.notify = !!o.notify;      // 通知を使うか（端末の許可とは別に、こちらでも持つ）
   o.v = 2;
   delete o.todos; delete o.help;
   return o;
 }
 
-let st;
+let st, keepOld = false;   // 読めない控えが残っているときは、こちらからは上書きしない
 try {
   const raw = localStorage.getItem(LS);
   st = raw ? JSON.parse(raw) : seed();
-} catch (e) { st = seed(); }
+  keepOld = !!raw && !(st && st.chara);
+} catch (e) { st = seed(); keepOld = true; }
 if (!st || !st.chara) st = seed();
+const hadSince = !!asDate(st.since);
 st = normalize(st);
+// 始めた日は一度決めたら動かさない。決めたその場で書いておく
+// （書かずにいると、何も触らない日が続くたびに「今日」へずれていく）
+if (!hadSince && !keepOld) { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} }
 
 /* 通知係（sw.js）はアプリが閉じていても動くので、localStorage を読めない。
    そこで「予定・レベル・呼び名」だけを、両方から読める置き場に写しておく。
@@ -531,6 +543,7 @@ function updateSpeech(now) {
 function render() {
   const now = new Date(), tk = keyOf(now);
   renderMemo();
+  renderRec();
   $("#topdate").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日（" + DOW[now.getDay()] + "）";
 
   // hero
@@ -706,6 +719,86 @@ function renderCal() {
   for (let i = first.getDay() + last.getDate(); i < 42; i++) html += '<div class="cell pad"></div>';
   $("#calGrid").innerHTML = html;
 }
+
+/* ---------- 記録 ---------- */
+/* 数字は「始めてから何日目」と「早起きの連続」。グラフは30日ぶんの達成数で、
+   ‹ › で1週ずつ前後へ送れる。recOff は、今日から何日さかのぼった所を右端にするか。 */
+const REC_DAYS = 30;
+let recOff = 0, recSel = null, recHover = null, recTotal = 0;
+const md = d => (d.getMonth() + 1) + "/" + d.getDate();
+const daysBetween = (a, b) => Math.round((b - a) / 864e5);   // 日付どうしの差（日数）
+/* 早起きがいちばん長く続いた日数。早起きは毎日のミッションなので、暦の上で1日ずつ続いた分を数える */
+function longestRun(id) {
+  let best = 0, run = 0, prev = null;
+  Object.keys(st.log).filter(k => st.log[k].includes(id)).sort().forEach(k => {
+    const d = dayOf(k);
+    run = prev && daysBetween(prev, d) === 1 ? run + 1 : 1;
+    best = Math.max(best, run); prev = d;
+  });
+  return best;
+}
+function renderRec() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const since = dayOf(st.since);
+  $("#r-days").innerHTML = (Math.max(0, daysBetween(since, today)) + 1) + "<small>日目</small>";
+  $("#r-since").textContent = since.getFullYear() + "年" + (since.getMonth() + 1) + "月" + since.getDate() + "日から";
+  const wake = st.missions.find(m => m.type === "wake");
+  $("#r-wake").innerHTML = streakOf(wake) + "<small>日</small>";
+  $("#r-best").innerHTML = longestRun(wake.id) + "<small>日</small>";
+
+  // グラフ。右端が今日から recOff 日前、そこから30日さかのぼる
+  const end = new Date(today); end.setDate(end.getDate() - recOff);
+  const days = [];
+  for (let i = REC_DAYS - 1; i >= 0; i--) { const d = new Date(end); d.setDate(d.getDate() - i); days.push(d); }
+  const counts = days.map(d => (st.log[keyOf(d)] || []).length);
+  const top = Math.max(2, ...counts);   // 1回だけの日が満タンに見えないよう、上は2回以上にとる
+  const thisYear = end.getFullYear() === today.getFullYear();
+  $("#recRange").textContent = (thisYear ? "" : end.getFullYear() + "年 ") + md(days[0]) + "〜" + md(end);
+  $("#recTop").textContent = top + "回";
+  $("#recBars").innerHTML = days.map((d, i) => {
+    const k = keyOf(d), n = counts[i], pre = d < since;   // 始めた日より前は何も描かない
+    return '<button class="bar' + (pre ? " pre" : "") + '" data-k="' + k + '"' +
+      (pre ? " disabled" : "") + ' aria-label="' + md(d) + "（" + DOW[d.getDay()] + "） " + n + '回">' +
+      (pre ? "" : '<i' + (n ? "" : ' class="zero"') + ' style="height:' + (n / top * 100).toFixed(1) + '%"></i>') + "</button>";
+  }).join("");
+  // 日付は右端から1週ごと。送る単位と同じなので、送っても目盛りの並びが変わらない
+  let x = "";
+  for (let i = REC_DAYS - 1; i >= 0; i -= 7) {
+    x += '<span style="left:' + ((i + .5) / REC_DAYS * 100).toFixed(2) + '%">' + (i === REC_DAYS - 1 && !recOff ? "今日" : md(days[i])) + "</span>";
+  }
+  $("#recX").innerHTML = x;
+  $("#recNext").disabled = recOff === 0;
+  $("#recPrev").disabled = days[0] <= since;
+  recTotal = counts.reduce((a, b) => a + b, 0);
+  paintRecPick();
+}
+/* グラフの上の1行。マウスが乗っている棒か、押して選んだ棒があればその日、無ければ30日の合計 */
+function paintRecPick() {
+  const k = recHover || recSel;
+  const b = k && $('#recBars .bar[data-k="' + k + '"]');
+  $("#recBars").classList.toggle("picking", !!b);
+  $$("#recBars .bar").forEach(x => x.classList.toggle("sel", x === b));
+  $("#recPick").innerHTML = b
+    ? esc(b.getAttribute("aria-label")).replace(/(\d+)回$/, "<b>$1</b>回")
+    : "この30日で <b>" + recTotal + "</b>回";
+}
+$("#recBars").addEventListener("click", e => {
+  const b = e.target.closest(".bar"); if (!b || b.disabled) return;
+  recSel = recSel === b.dataset.k ? null : b.dataset.k;   // 同じ棒をもう一度おすと戻る
+  paintRecPick();
+});
+// マウスは乗せるだけで見られるように。離れたら、押して選んだ棒（無ければ合計）に戻る
+$("#recBars").addEventListener("pointerover", e => {
+  if (e.pointerType !== "mouse") return;
+  const b = e.target.closest(".bar");
+  recHover = b && !b.disabled ? b.dataset.k : null; paintRecPick();
+});
+$("#recBars").addEventListener("pointerleave", e => {
+  if (e.pointerType !== "mouse") return;
+  recHover = null; paintRecPick();
+});
+$("#recPrev").addEventListener("click", () => { recOff += 7; recSel = null; renderRec(); });
+$("#recNext").addEventListener("click", () => { recOff = Math.max(0, recOff - 7); recSel = null; renderRec(); });
 
 /* ---------- 画像の物置 ---------- */
 /* 画像の本体だけは IndexedDB に置く。JSONの保存場所（localStorage）は5MBほどしかなく、
@@ -1151,7 +1244,8 @@ $("#mDelete").addEventListener("click", e => {
   const target = st.missions.find(m => m.id === editing);
   if (target && target.type === "wake") { closeSheet("#sheetM"); return; }   // 早起きは消せない
   st.missions = st.missions.filter(m => m.id !== editing);
-  Object.keys(st.log).forEach(k => { st.log[k] = st.log[k].filter(id => id !== editing); if (!st.log[k].length) delete st.log[k]; });
+  // 達成の記録（st.log）は残す。消すと、記録タブの数字がミッションを消したとたんに減ってしまう。
+  // 残った番号はもうどのミッションとも一致しないので、カレンダーや今日の一覧には出ない。
   delArm = false; e.target.textContent = "このミッションを消す";
   save(); render(); closeSheet("#sheetM");
 });
@@ -1591,6 +1685,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") { paintBackup(); paintPass(); }
   if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
+  if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
 }));
 $("#prevM").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
 $("#nextM").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
