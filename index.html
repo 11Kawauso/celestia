@@ -227,48 +227,20 @@
 <div class="sheet" id="sheetM">
   <div class="sheetin">
     <div class="grab"></div>
-    <div class="sheettitle" id="mTitle">ミッションを追加</div>
+    <div class="sheettitle" id="mTitle">早起きミッションを編集</div>
 
-    <!-- 早起きは固定ミッション。追加も削除もできず、時刻だけ変えられる -->
+    <!-- 早起きは固定ミッション。追加も削除もできず、時刻だけ変えられる。
+         自分で「やった」と申告するだけのミッションは、レベル上げのごまかしになるので置かない -->
     <div id="mWake">
       <div class="lab" style="margin-bottom:6px">起きる時刻</div>
       <div class="pills" id="mWakeTime"></div>
       <div class="note" style="margin-top:8px">朝5時から、えらんだ時刻までの間だけ報酬を受け取れます。早い時刻ほどEXPが多くなります。毎日くり返します。</div>
     </div>
 
-    <!-- 自由 -->
-    <div id="mFree">
-      <input class="field" id="mName" placeholder="例：ストレッチをする">
-      <div>
-        <div class="lab" style="margin-bottom:6px">もらえるEXP</div>
-        <div class="pills" id="mExp">
-          <button class="pill" data-e="10">かるい 10</button>
-          <button class="pill on" data-e="20">ふつう 20</button>
-          <button class="pill" data-e="30">たいへん 30</button>
-        </div>
-      </div>
-      <div>
-        <div class="lab" style="margin-bottom:6px">くり返す曜日</div>
-        <div class="days" id="mDays"></div>
-      </div>
-      <div>
-        <div class="lab" style="margin-bottom:6px">時間のしばり</div>
-        <div class="pills" id="mMode">
-          <button class="pill on" data-m="">なし</button>
-          <button class="pill" data-m="before">この時刻まで</button>
-          <button class="pill" data-m="after">この時刻から</button>
-        </div>
-        <div class="timerow" id="mTimeRow" style="margin-top:8px" hidden>
-          <input class="field" type="time" id="mTime" value="07:00">
-        </div>
-      </div>
-    </div>
-
     <div class="btnrow">
       <button class="btn" id="mCancel">やめる</button>
       <button class="btn pri" id="mSave">保存する</button>
     </div>
-    <button class="btn danger" id="mDelete" hidden>このミッションを消す</button>
   </div>
 </div>
 
@@ -322,19 +294,28 @@
     <div class="sec secbox">
       <div class="sechead">
         <div class="sectitle">きょうのミッション</div>
-        <button class="addbtn" id="addMission">＋ 追加</button>
       </div>
       <div id="missionList"></div>
+    </div>
+
+    <!-- 月〜日の7日ぶん早起きできたら、まとめて報酬 -->
+    <div class="sec secbox">
+      <div class="sechead">
+        <div class="sectitle" id="weekTitle">今週の早起き</div>
+        <span class="expbadge" id="weekExp"></span>
+      </div>
+      <div class="row weekrow">
+        <div class="wkcells" id="weekCells"></div>
+        <div class="wkfoot">
+          <div class="note" id="weekMsg"></div>
+          <button class="claim" id="weekClaim" data-act="weekclaim">未クリア</button>
+        </div>
+      </div>
     </div>
 
     <div class="sec secbox" id="todayEventsSec" hidden>
       <div class="sechead"><div class="sectitle">きょうの予定</div></div>
       <div id="todayEvents"></div>
-    </div>
-
-    <div class="sec secbox">
-      <div class="sechead"><div class="sectitle">きょう以外のミッション</div></div>
-      <div id="otherMissions"></div>
     </div>
   </div>
 </div>

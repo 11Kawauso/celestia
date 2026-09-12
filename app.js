@@ -72,26 +72,11 @@ function normalize(o) {
   Object.keys(sd).forEach(k => { if (typeof sd[k] === "string") o.said[k] = sd[k]; });
   o.theme = ["auto", "dark", "light"].indexOf(o.theme) >= 0 ? o.theme : "auto";
 
-  o.missions = asArr(o.missions).map(x => {
-    const m = asObj(x);
-    // 早起きは中身をすべて時刻から作り直す。手で書きかえられてもずれない
-    if (m.type === "wake") return wakeMission(asStr(m.id) || uid(), asStr(m.time));
-    const mode = (m.mode === "before" || m.mode === "after") ? m.mode : "";
-    return {
-      id: asStr(m.id) || uid(),
-      type: "free",
-      title: asStr(m.title),
-      exp: Math.max(0, Math.floor(asNum(m.exp, 10))),
-      days: asArr(m.days).map(d => Math.floor(asNum(d, -1))).filter(d => d >= 0 && d <= 6),
-      mode: mode,
-      time: mode ? asTime(m.time) : ""
-    };
-  });
-
-  // 早起きは固定ミッション。無ければ足し、増えていたら最初の1つに寄せる
-  const wakes = o.missions.filter(m => m.type === "wake");
-  o.missions = [wakes[0] || wakeMission(uid(), WAKE_DEFAULT)]
-    .concat(o.missions.filter(m => m.type !== "wake"));
+  /* ミッションは早起きの1つだけ。自分で「やった」と申告するだけのミッションは、
+     押すだけでレベルが上がってしまうので置かない（昔作ったものはここで捨てる。達成の記録は残る）。
+     早起きは中身をすべて時刻から作り直す。手で書きかえられてもずれない。 */
+  const wake = asArr(o.missions).map(asObj).find(m => m.type === "wake");
+  o.missions = [wake ? wakeMission(asStr(wake.id) || uid(), asStr(wake.time)) : wakeMission(uid(), WAKE_DEFAULT)];
 
   o.goals = asArr(o.goals).map(x => {
     const g = asObj(x);
@@ -151,6 +136,9 @@ function normalize(o) {
     const list = asArr(lg[k]).filter(x => typeof x === "string");
     if (list.length) o.log[k] = list;
   });
+
+  // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
+  o.wkClaim = asArr(o.wkClaim).map(asDate).filter(Boolean);
 
   /* 始めた日。記録タブの「◯日目」の起点。
      これを持っていない古いデータは、残っている記録のいちばん古い日を始めた日とみなす。 */
@@ -307,6 +295,63 @@ function daysLabel(m) {
 }
 const sortKey = m => (m.mode && m.time ? m.time : "99:99");
 
+/* ---------- 今週の早起き ---------- */
+/* 月〜日の7日ぶん早起きできたら、まとめて報酬。
+   寝坊した日（今日が時間切れになったときも）がひとつでもあれば、その週はもう達成できない。
+   始める前の日が混じる週も数えない。受け取った週は、その月曜の日付を st.wkClaim に残す。 */
+const WEEK_EXP = 100;
+const mondayOf = d => { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - (m.getDay() + 6) % 7); return m; };
+/* 1週ぶんの様子。days の s は done（起きた）／miss（寝坊）／today（今日、まだ間に合う）／
+   future（これから）／pre（始める前）。state は受け取りボタンの状態（claimState と同じ言葉）。 */
+function weekInfo(mon, now) {
+  const w = st.missions.find(m => m.type === "wake"), tk = keyOf(now);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon); d.setDate(d.getDate() + i);
+    const k = keyOf(d);
+    const s = k < st.since ? "pre"
+      : doneOn(w.id, k) ? "done"
+      : k < tk || (k === tk && claimState(w, now, false) === "late") ? "miss"
+      : k === tk ? "today" : "future";
+    days.push({ d: d, s: s });
+  }
+  const mk = keyOf(mon);
+  const state = st.wkClaim.includes(mk) ? "done"
+    : days.every(x => x.s === "done") ? "ready"
+    : days.some(x => x.s === "miss" || x.s === "pre") ? "late" : "lock";
+  return { mk: mk, days: days, state: state, last: false };
+}
+/* 画面に出す週。先週をそろえたのに受け取り忘れていたら、月曜になってもそちらを先に出す */
+function weekShown(now) {
+  const mon = mondayOf(now), prev = new Date(mon);
+  prev.setDate(prev.getDate() - 7);
+  const lw = weekInfo(prev, now);
+  if (lw.state === "ready") { lw.last = true; return lw; }
+  return weekInfo(mon, now);
+}
+const WEEK_LABEL = { done: "受け取り済み", ready: "報酬を受け取る", late: "達成ならず", lock: "未クリア" };
+const ICO_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function renderWeek(now) {
+  const wk = weekShown(now);
+  $("#weekTitle").textContent = wk.last ? "先週の早起き" : "今週の早起き";
+  $("#weekExp").textContent = "EXP+" + WEEK_EXP;
+  $("#weekCells").innerHTML = wk.days.map(x =>
+    '<div class="wkday ' + x.s + '"><span>' + DOW[x.d.getDay()] + "</span><i>" +
+    (x.s === "done" ? ICO_CHECK : x.s === "miss" ? "×" : x.s === "pre" ? "−" : "") + "</i></div>").join("");
+  const miss = wk.days.find(x => x.s === "miss");
+  const left = wk.days.filter(x => x.s === "today" || x.s === "future").length;
+  $("#weekMsg").textContent =
+    wk.state === "done" ? "達成しました。また月曜から。"
+    : wk.state === "ready" ? "7日そろいました。"
+    : wk.state === "lock" ? "あと" + left + "日"
+    : miss ? DOW[miss.d.getDay()] + "曜に寝坊したので、今週は達成できません。月曜からまた挑戦できます。"
+    : "始める前の日があるので、今週は数えません。月曜から挑戦できます。";
+  const b = $("#weekClaim");
+  b.className = "claim " + wk.state;
+  b.textContent = WEEK_LABEL[wk.state];
+  b.dataset.wk = wk.mk;
+}
+
 /* ---------- 祝日 ---------- */
 /* 国民の祝日・振替休日・国民の休日を出す。外部データは使わない。
    春分と秋分は近似式で、1980〜2099年のあいだは実際の暦と一致する。
@@ -392,7 +437,8 @@ const OPEN_SCENES = [
    ・場面のキー
        first        はじめてアプリを開いたとき（1度だけ）
        wakeClaim    1 早起きの報酬を受け取った
-       missionClaim 3 早起き以外の報酬を受け取った
+       missionClaim 3 早起き以外の報酬を受け取った（今は早起きしか無いので出ない。ミッションを足したときのために残してある）
+       weekClaim      今週の早起き（月〜日の7日）の報酬を受け取った
        goalDone     6 目標を達成した
        wakeLate     2 早起きが時間切れ
        night        4 夜（21時〜0時）
@@ -407,6 +453,8 @@ const SPEECH = [
                    "ほう、起きられたのか。……まあ、悪くない。"],
     missionClaim: ["それくらいはできて当然だろう。",
                    "ふん。持っていけ。"],
+    weekClaim:    ["……七日、一度も寝坊しなかったのか。認めてやる。",
+                   "ふん。一週間続いたか。持っていけ。"],
     goalDone:     ["やり遂げたのか。……お前にしては上出来だ。",
                    "ふん。まぐれではないと、証明してみせろ。"],
     wakeLate:     ["また寝坊か。{you}に期待した私がばかだった。",
@@ -425,6 +473,8 @@ const SPEECH = [
                    "おはよう。ほら、受け取っていきなさい。"],
     missionClaim: ["ちゃんとやったのね。えらいじゃない。",
                    "……まあ、こんなものかしら。はい、どうぞ。"],
+    weekClaim:    ["一週間、毎朝起きられたのね。……ちょっと感心したわ。",
+                   "七日続けるなんて、やるじゃない。はい、ご褒美。"],
     goalDone:     ["やり切ったのね。ちょっと、見直したわ。",
                    "……お疲れさま。今日はゆっくりしなさい。"],
     wakeLate:     ["寝坊ね。まあ、{you}にしては頑張ってるほうかしら。",
@@ -443,6 +493,8 @@ const SPEECH = [
                    "{you}、おはよう。今日も会えてうれしい。"],
     missionClaim: ["{you}、よくやったね。",
                    "きちんと続けてるね。……すごいと思う。"],
+    weekClaim:    ["{you}、一週間ずっと早起きできたね。本当にすごい。",
+                   "毎朝会えた一週間だったね。うれしかった。"],
     goalDone:     ["{you}、やったね。ずっと見てたよ。",
                    "達成おめでとう。私も、うれしい。"],
     wakeLate:     ["{you}、おはよう。……まあ、そんな日もあるよ。",
@@ -461,6 +513,8 @@ const SPEECH = [
                    "{you}、おはようございます。報酬をお受け取りください。"],
     missionClaim: ["{you}、見事でございます。",
                    "さすがでございます。どうぞ、お納めください。"],
+    weekClaim:    ["{you}、七日間、一日も欠かさず。まことにご立派です。",
+                   "この一週間のご精進、しかと見届けました。どうぞお納めください。"],
     goalDone:     ["{you}、成し遂げられましたね。心よりお祝い申し上げます。",
                    "あなたの歩みを、ずっと見ておりました。おめでとうございます。"],
     wakeLate:     ["{you}、おはようございます。お疲れが出たのでしょう。",
@@ -501,7 +555,8 @@ function say(scene, now, tail) {
 function moreTail(now) {
   const left = st.missions
     .filter(m => m.days.includes(now.getDay()))
-    .filter(m => claimState(m, now, false) === "ready").length;
+    .filter(m => claimState(m, now, false) === "ready").length +
+    (weekShown(now).state === "ready" ? 1 : 0);   // 日曜の早起きで、週の報酬も受け取れるようになる
   if (!left) return "";
   const l = SPEECH[toneOf(st.chara.level)].more;
   if (!l || !l.length) return "";
@@ -569,14 +624,9 @@ function render() {
   const ml = $("#missionList");
   ml.innerHTML = todays.length
     ? todays.map(m => missionRow(m, tk, now)).join("")
-    : '<div class="empty">今日のミッションはありません。<br>「＋ 追加」から作れます。</div>';
+    : '<div class="empty">今日のミッションはありません。</div>';
   ml.style.display = "flex"; ml.style.flexDirection = "column"; ml.style.gap = "9px";
-
-  const others = st.missions.filter(m => !m.days.includes(now.getDay()));
-  const ol = $("#otherMissions");
-  ol.parentElement.hidden = others.length === 0;
-  ol.innerHTML = others.map(m => missionRow(m, tk, now, true)).join("");
-  ol.style.display = "flex"; ol.style.flexDirection = "column"; ol.style.gap = "9px";
+  renderWeek(now);
 
   // today's events
   const ev = (st.events[tk] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
@@ -873,91 +923,30 @@ $("#openStatus").addEventListener("click", () => openSheet("#sheetS"));
 $("#sClose").addEventListener("click", () => closeSheet("#sheetS"));
 
 /* mission editor */
-let editing = null, draft = null;
-$("#mDays").innerHTML = DOW.map((d, i) => '<button class="day" data-d="' + i + '">' + d + "</button>").join("");
+/* 直せるのは早起きの時刻だけ。追加も削除もない */
+let editing = null, wakeDraft = WAKE_DEFAULT;
 $("#mWakeTime").innerHTML = WAKE.map(w =>
   '<button class="pill" data-t="' + w.time + '">' + wakeHour(w.time) +
   '時<span class="pexp">EXP+' + w.exp + "</span></button>").join("");
 
 function paintDraft() {
-  const wake = draft.type === "wake";
-  $("#mWake").hidden = !wake;
-  $("#mFree").hidden = wake;
-  if (wake) {
-    draft.wakeTime = wakeAt(draft.wakeTime).time;
-    $$("#mWakeTime .pill").forEach(p => p.classList.toggle("on", p.dataset.t === draft.wakeTime));
-    return;
-  }
-  $("#mName").value = draft.title;
-  $$("#mExp .pill").forEach(p => p.classList.toggle("on", +p.dataset.e === draft.exp));
-  $$("#mDays .day").forEach(p => p.classList.toggle("on", draft.days.includes(+p.dataset.d)));
-  $$("#mMode .pill").forEach(p => p.classList.toggle("on", p.dataset.m === (draft.mode || "")));
-  $("#mTimeRow").hidden = !draft.mode;
-  $("#mTime").value = draft.time || "07:00";
+  $$("#mWakeTime .pill").forEach(p => p.classList.toggle("on", p.dataset.t === wakeDraft));
 }
 function openMission(m) {
-  editing = m ? m.id : null;
-  // 追加でつくれるのは自由ミッションだけ。早起きは固定で、時刻の変更だけできる
-  draft = m
-    ? { type: m.type, title: m.title, exp: m.exp, days: m.days.slice(),
-        mode: m.mode || "", time: m.time || "",
-        wakeTime: m.type === "wake" ? m.time : WAKE_DEFAULT }
-    : { type: "free", title: "", exp: 20, days: [0,1,2,3,4,5,6],
-        mode: "", time: "", wakeTime: WAKE_DEFAULT };
-  $("#mTitle").textContent = m
-    ? (m.type === "wake" ? "早起きミッションを編集" : "ミッションを編集")
-    : "ミッションを追加";
-  $("#mDelete").hidden = !m || m.type === "wake";   // 早起きは消せない
+  editing = m.id;
+  wakeDraft = wakeAt(m.time).time;
   paintDraft(); openSheet("#sheetM");
 }
 $("#mWakeTime").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
-  draft.wakeTime = b.dataset.t; paintDraft();
+  wakeDraft = b.dataset.t; paintDraft();
 });
-$("#addMission").addEventListener("click", () => openMission(null));
-$("#mExp").addEventListener("click", e => { const b = e.target.closest(".pill"); if (!b) return; draft.exp = +b.dataset.e; paintDraft(); });
-$("#mDays").addEventListener("click", e => {
-  const b = e.target.closest(".day"); if (!b) return;
-  const d = +b.dataset.d, i = draft.days.indexOf(d);
-  if (i < 0) draft.days.push(d); else draft.days.splice(i, 1);
-  paintDraft();
-});
-$("#mMode").addEventListener("click", e => {
-  const b = e.target.closest(".pill"); if (!b) return;
-  draft.mode = b.dataset.m; if (draft.mode && !draft.time) draft.time = "07:00";
-  paintDraft();
-});
-$("#mTime").addEventListener("change", e => { draft.time = e.target.value; });
-$("#mName").addEventListener("input", e => { draft.title = e.target.value; });
 $("#mCancel").addEventListener("click", () => closeSheet("#sheetM"));
 $("#mSave").addEventListener("click", () => {
-  let data;
-  if (draft.type === "wake") {
-    data = wakeMission(null, draft.wakeTime);
-    delete data.id;
-  } else {
-    const t = draft.title.trim();
-    if (!t) { $("#mName").focus(); return; }
-    if (!draft.days.length) draft.days = [0,1,2,3,4,5,6];
-    data = { type: "free", title: t, exp: draft.exp, days: draft.days,
-             mode: draft.mode, time: draft.mode ? draft.time : "" };
-  }
-  if (editing) Object.assign(st.missions.find(x => x.id === editing), data);
-  else st.missions.push(Object.assign({ id: uid() }, data));
+  const m = st.missions.find(x => x.id === editing);
+  if (m) Object.assign(m, wakeMission(m.id, wakeDraft));
   save(); render(); closeSheet("#sheetM");
 });
-let delArm = false;
-$("#mDelete").addEventListener("click", e => {
-  if (!delArm) { delArm = true; e.target.textContent = "もう一度おすと消えます"; setTimeout(() => { delArm = false; e.target.textContent = "このミッションを消す"; }, 3000); return; }
-  const target = st.missions.find(m => m.id === editing);
-  if (target && target.type === "wake") { closeSheet("#sheetM"); return; }   // 早起きは消せない
-  st.missions = st.missions.filter(m => m.id !== editing);
-  // 達成の記録（st.log）は残す。消すと、記録タブの数字がミッションを消したとたんに減ってしまう。
-  // 残った番号はもうどのミッションとも一致しないので、カレンダーや今日の一覧には出ない。
-  delArm = false; e.target.textContent = "このミッションを消す";
-  save(); render(); closeSheet("#sheetM");
-});
-
 /* 確認の小窓。消す前に一度だけ止める。中身を差しかえて他でも使える。 */
 let confirmFn = null;
 function askConfirm(title, name, fn) {
@@ -1173,6 +1162,14 @@ document.addEventListener("click", e => {
     if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
     toggleDone(m.id, keyOf(now), true); addExp(m.exp);   // 受け取ったら取り消せない
     say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
+    save(); render();
+  }
+  if (act === "weekclaim") {
+    const now = new Date(), wk = weekShown(now);
+    // 押すまでのあいだに日付がまたいで、別の週に変わっていたら受け取らない
+    if (wk.state !== "ready" || wk.mk !== b.dataset.wk) { flash(b); return; }
+    st.wkClaim.push(wk.mk); addExp(WEEK_EXP);
+    say("weekClaim", now, moreTail(now));
     save(); render();
   }
   if (act === "edit") { const m = st.missions.find(x => x.id === id); if (m) openMission(m); }

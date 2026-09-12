@@ -330,6 +330,23 @@ main:not(.on-home) .homeonly{display:none}
 .chip.imp{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent);font-weight:700}
 .chip.fire{color:var(--dusk);background:color-mix(in srgb,var(--dusk) 13%,transparent)}
 .chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+/* 今週の早起き。月〜日の7マス。起きた日は金、寝坊した日は赤い×、今日はふちだけ金。 */
+.weekrow{flex-direction:column;align-items:stretch;gap:12px;padding:12px 10px}
+.wkcells{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wkday{display:flex;flex-direction:column;align-items:center;gap:4px}
+.wkday span{font-size:10.5px;color:var(--ink3)}
+.wkday i{
+  width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
+  border:1.5px solid var(--line);font-style:normal;font-size:14px;font-weight:700;line-height:1;color:var(--ink3);
+}
+.wkday i svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.wkday.done i{background:var(--dawn);border-color:transparent;color:var(--bg)}
+.wkday.miss i{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+.wkday.today span{color:var(--dawn);font-weight:700}
+.wkday.today i{border:1.5px dashed var(--dawn)}
+.wkday.pre i{border-style:dotted;opacity:.6}
+.wkfoot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wkfoot .note{flex:1;min-width:0}
 .expbadge{font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums;flex:none;letter-spacing:0;white-space:nowrap}
 .edit{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;color:var(--ink3)}
 .edit:active{background:var(--bg3)}
@@ -526,7 +543,6 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   font-size:10px;line-height:14px;color:var(--ink3);white-space:nowrap;font-variant-numeric:tabular-nums;
 }
 
-#mFree{display:flex;flex-direction:column;gap:13px}
 .pill .pexp{margin-left:6px;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
 
 /* ---- メモ ---- */
