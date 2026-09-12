@@ -1039,18 +1039,21 @@ $("#miDelete").addEventListener("click", e => {
 });
 
 /* ---------- sheets ---------- */
-function openSheet(id) { $("#scrim").classList.add("on"); $(id).classList.add("on"); paintBar(); }
+/* 後ろを暗くする覆いは、下から出るシートのときだけ。
+   右から出るパネルは画面いっぱいを覆う別ページなので、暗くする相手がいない。
+   しかも覆いをつけると、パネルがすべり込むまでの間だけ上端が暗く見え、
+   iPhone がその色をステータスバーに拾ったまま戻さなくなる。 */
+function paintScrim() { $("#scrim").classList.toggle("on", $$(".sheet.on:not(.side)").length > 0); }
+function openSheet(id) { $(id).classList.add("on"); paintScrim(); paintBar(); }
 /* 1枚だけ閉じる。ミッションを保存したときに、その下のステータス画面まで
    一緒に閉じてしまわないように、閉じるのは自分の分だけにする。 */
 function closeSheet(id) {
   $(id).classList.remove("on");
-  $("#scrim").classList.toggle("on", $$(".sheet.on").length > 0);
-  paintBar();
+  paintScrim(); paintBar();
 }
 function closeSheets() {                       // 全部たたむ（タブを移ったときなど）
-  $("#scrim").classList.remove("on");
   $$(".sheet").forEach(x => x.classList.remove("on"));
-  paintBar();
+  paintScrim(); paintBar();
 }
 /* シートの外を押したら閉じる。閉じるのはいちばん手前の1枚だけなので、
    ステータス画面の上でミッションを編集していても、後ろまでは消えない。
