@@ -63,9 +63,11 @@ async function buildNotice(d) {
   if (String(d.id || "").startsWith("test-")) return { title: "セレスティア", body: "試しの通知だ。ちゃんと届いているぞ。" };
   const st = await stateNow();
   const list = st && st.events && st.events[d.k];
-  // 予定に無ければ、くりかえし通知のほうを見る（どちらも控えの中にある）
+  // 予定に無ければ、くりかえし通知のほうを見る（どちらも控えの中にある）。
+  // くりかえし通知は「番号@日付」で届くので、@ より前が番号
+  const rid = String(d.id || "").split("@")[0];
   const ev = (list && list.find(x => x.id === d.id)) ||
-    (st && st.reminders && st.reminders.find(x => x.id === d.id));
+    (st && st.reminders && st.reminders.find(x => x.id === rid));
   if (!ev) return { title: "セレスティア", body: "予定の時間だぞ。" };   // 控えが無いときの保険
   const today = new Date();
   const key = today.getFullYear() + "-" +

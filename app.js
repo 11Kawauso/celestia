@@ -1851,7 +1851,13 @@ function paintPingLog() {
   const g = readPingLog();
   if (!canNotify()) { el.textContent = ""; return; }
   if (!g) { el.textContent = "まだサーバーへ送っていません。"; return; }
-  if (g.err) { el.textContent = "送れませんでした（" + whenText(new Date(g.at)) + "）。電波のあるところで開き直すと、もう一度送ります。"; return; }
+  if (g.err) {
+    // 「→」があるのはサーバーまで届いて断られたとき（sbWrite のエラー）。電波のせいではないので、中身を見せる
+    el.textContent = g.err.includes(" → ")
+      ? "サーバーに断られました（" + whenText(new Date(g.at)) + "）：" + g.err.split(" → ").pop().slice(0, 160)
+      : "送れませんでした（" + whenText(new Date(g.at)) + "）。電波のあるところで開き直すと、もう一度送ります。";
+    return;
+  }
   el.textContent = g.n
     ? "サーバーに" + g.n + "件あずけています。次は " + whenText(new Date(g.next)) + "（送ったのは " + whenText(new Date(g.at)) + "）"
     : "いま鳴らす予定はありません（送ったのは " + whenText(new Date(g.at)) + "）";
@@ -1869,10 +1875,12 @@ async function syncPings() {
       if (at.getTime() > now) rows.push({ owner: owner, event_id: e.id, day_key: k, fire_at: at.toISOString() });
     });
   });
-  // くりかえし通知のぶんも同じ棚に並べる
+  // くりかえし通知のぶんも同じ棚に並べる。
+  // 棚（pings）は「持ち主＋番号」が重なると受けつけない決まりなので、番号に日付を足して1行ずつ変える。
+  // 重なった1行のせいで全部が断られ、ふつうの予定まで鳴らなくなっていた。sw.js は @ より前で引く。
   st.reminders.forEach(r => {
     remDays(r, new Date(now)).forEach(d => {
-      if (d.getTime() > now) rows.push({ owner: owner, event_id: r.id,
+      if (d.getTime() > now) rows.push({ owner: owner, event_id: r.id + "@" + keyOf(d),
         day_key: keyOf(d), fire_at: d.toISOString() });
     });
   });
