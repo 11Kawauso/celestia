@@ -573,6 +573,15 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 /* 【試し・あとで消す】閉じるときの消え方（app.js の barTest を見よ） */
 .scrim.instant:not(.on){transition:none}
 .scrim.slow:not(.on){transition:opacity .6s, visibility 0s .6s}
+/* 【試し・あとで消す】案A。見た目は .scrim と同じで、位置の決め方だけ fixed ではなく absolute。
+   iPhone は「画面のいちばん上に固定された部品」の色を拾って時計のところを塗るので、そこから外す。
+   ページ自体は転がらない（body は画面の高さで止めてある）ので、absolute でも画面全体を覆える。 */
+.dimmer{
+  position:absolute;inset:0;z-index:40;background:rgba(10,8,20,.5);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .22s, visibility 0s .22s;
+}
+.dimmer.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s, visibility 0s}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:42;
   background:var(--bg);border-top:1px solid var(--line);
