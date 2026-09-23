@@ -1657,11 +1657,33 @@ let barDark = false;
 function paintBar() {
   const m = document.querySelector('meta[name="theme-color"]');
   if (!m) return;
-  const dim = $$(".sheet.on:not(.side)").length > 0;
+  const dim = barTest !== 2 && $$(".sheet.on:not(.side)").length > 0;   // 【試し】2 は上の色を変えない
   m.setAttribute("content", barDark
     ? (dim ? "#090914" : "#0d1020")     // 覆い rgba(10,8,20,.5) を重ねた色
     : (dim ? "#7f7f88" : "#f3f5fc"));
 }
+/* 【試し・あとで消す】シートを閉じたとき、画面の上（ステータスバー）だけ遅れて明るくなる件。
+   実機でしか起きないので、戻り方を4通り用意して見比べてもらう。
+     1 いまのまま（上の色を切りかえ、幕は0.22秒で消す）
+     2 上の色（theme-color）を変えない → これでも上が暗くなるなら、iPhoneは幕の色を拾っている
+     3 幕を一瞬で消す
+     4 上の色は先に戻し、幕はゆっくり（0.6秒）消す
+   試しの画面を閉じて1秒たったら、ふだんの動き（1）に戻る。 */
+let barTest = 1;
+$("#barTests").addEventListener("click", e => {
+  const b = e.target.closest("[data-bt]"); if (!b) return;
+  barTest = +b.dataset.bt;
+  const s = $("#scrim");
+  s.classList.toggle("instant", barTest === 3);
+  s.classList.toggle("slow", barTest === 4);
+  askConfirm("試し " + b.textContent, "「やめる」か「消す」で閉じて、上の部分がほかと同時に戻るか見てください。（何も消えません）", () => {});
+});
+// 試しの画面を閉じたら、少し待ってからふだんの動きに戻す（閉じる動きの途中で戻さない）
+["#cNo", "#cYes"].forEach(id => $(id).addEventListener("click", () => {
+  if (barTest === 1) return;
+  setTimeout(() => { barTest = 1; $("#scrim").classList.remove("instant", "slow"); }, 1000);
+}));
+
 /* ---------- 通知 ---------- */
 /* いまできるのは「許可をもらう」「テストで1通出す」まで。
    予定にあわせて自動で届く仕組み（サーバー）は、このあと足す。

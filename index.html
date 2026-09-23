@@ -177,6 +177,18 @@
         <div class="lab">やりなおし</div>
         <button class="btn danger" id="wipe">ぜんぶ消して最初から</button>
       </div>
+
+      <!-- 【試し・あとで消す】画面の上だけ遅れて明るくなる件の見比べ（app.js の barTest） -->
+      <div class="card">
+        <div class="lab">試し：上の部分の戻り方</div>
+        <div class="note">それぞれ押して画面を出し、閉じたときに上の部分（時計のところ）がほかと同時に戻るか見てください。何も消えません。</div>
+        <div class="btnrow" id="barTests" style="flex-wrap:wrap">
+          <button class="btn" data-bt="1">1 いまのまま</button>
+          <button class="btn" data-bt="2">2 上の色を変えない</button>
+          <button class="btn" data-bt="3">3 一瞬で消す</button>
+          <button class="btn" data-bt="4">4 ゆっくり消す</button>
+        </div>
+      </div>
     </section>
     </div><!-- /.scroller -->
 

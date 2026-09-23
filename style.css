@@ -570,6 +570,9 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   transition:opacity .22s, visibility 0s .22s;
 }
 .scrim.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s, visibility 0s}
+/* 【試し・あとで消す】閉じるときの消え方（app.js の barTest を見よ） */
+.scrim.instant:not(.on){transition:none}
+.scrim.slow:not(.on){transition:opacity .6s, visibility 0s .6s}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:42;
   background:var(--bg);border-top:1px solid var(--line);
