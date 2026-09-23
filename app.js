@@ -608,9 +608,15 @@ function render() {
   $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
 
   // キャラの絵とセリフ
-  $("#portrait").innerHTML = CHARA_IMG
-    ? '<img src="' + esc(CHARA_IMG) + '" alt="' + CHARA + '">'
-    : '<span class="rune">' + CHARA[0] + "</span>";
+  // 枠の高さは絵に合わせて決まるので、毎分の描き直しで作り直さない（一瞬つぶれて画面が跳ねる）
+  const pt = $("#portrait");
+  if (pt.dataset.img !== CHARA_IMG) {
+    pt.dataset.img = CHARA_IMG;
+    pt.classList.toggle("hasimg", !!CHARA_IMG);
+    pt.innerHTML = CHARA_IMG
+      ? '<img src="' + esc(CHARA_IMG) + '" alt="' + CHARA + '">'
+      : '<span class="rune">' + CHARA[0] + "</span>";
+  }
   $("#speech").textContent = st.say;
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))

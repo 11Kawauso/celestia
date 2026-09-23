@@ -213,6 +213,10 @@ main:not(.on-home) .homeonly{display:none}
   display:grid;place-items:center;
 }
 .portrait img{width:100%;height:100%;object-fit:cover;display:block}
+/* 絵が入ったら、枠の形は絵そのものの縦横比にする。どこも切らずに全部見せ、
+   画面に入りきらないぶんは上下に転がして見る（ホームは転がす前提。バーも隠してある）。 */
+.portrait.hasimg{aspect-ratio:auto;max-height:none;display:block}
+.portrait.hasimg img{height:auto}
 /* 絵が入るまでの仮置き */
 .portrait .rune{font-family:"Shippori Mincho B1",serif;font-size:60px;color:var(--ink3);opacity:.45}
 /* セリフはただの長方形。角も落とさず、絵を指す三角も付けない。
