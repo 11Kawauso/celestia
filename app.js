@@ -845,7 +845,7 @@ $("#recNext").addEventListener("click", () => { recOff = Math.max(0, recOff - 7)
 
 /* ---------- メモ ---------- */
 /* タイトルと本文だけのメモ。押すと編集の窓が開き、消すのもその窓から。 */
-let mEditing = null, mDelArm = false;
+let mEditing = null;
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
 const memoOf = id => st.memo.find(x => x.id === id);
 
@@ -861,12 +861,11 @@ function renderMemo() {
 
 function openMemoEdit(id) {
   const m = id ? memoOf(id) : null;
-  mEditing = m ? m.id : null; mDelArm = false;
+  mEditing = m ? m.id : null;
   $("#mmHead").textContent = m ? "メモ" : "メモを書く";
   $("#mmName").value = m ? m.name : "";
   $("#mmBody").value = m ? m.body : "";
   $("#mmDelete").hidden = !m;
-  $("#mmDelete").textContent = "このメモを消す";
   openSheet("#sheetMEdit");
   if (!m) setTimeout(() => $("#mmName").focus(), 60);
 }
@@ -883,16 +882,13 @@ $("#mmSave").addEventListener("click", () => {
   else st.memo.push({ id: uid(), name: name, body: body, at: keyOf(new Date()) });
   save(); renderMemo(); closeSheet("#sheetMEdit");
 });
-/* 消すのは二度押し。一度目は聞き返すだけ（アプリのほかの場所と同じやり方）。 */
-$("#mmDelete").addEventListener("click", e => {
-  if (!mDelArm) {
-    mDelArm = true; e.target.textContent = "もう一度おすと消えます";
-    setTimeout(() => { if (mDelArm) { mDelArm = false; e.target.textContent = "このメモを消す"; } }, 3000);
-    return;
-  }
-  st.memo = st.memo.filter(x => x.id !== mEditing);
-  mDelArm = false;
-  save(); renderMemo(); closeSheet("#sheetMEdit");
+/* 消す前に確認の小窓を出す（アプリのほかの場所と同じやり方）。 */
+$("#mmDelete").addEventListener("click", () => {
+  const m = memoOf(mEditing); if (!m) return;
+  askConfirm("このメモを消しますか", m.name || "名前のないメモ", () => {
+    st.memo = st.memo.filter(x => x.id !== m.id);
+    save(); renderMemo(); closeSheet("#sheetMEdit");
+  });
 });
 
 /* ---------- sheets ---------- */
@@ -1466,16 +1462,12 @@ $("#gSave").addEventListener("click", () => {
   }
   save(); render(); closeSheet("#sheetG");
 });
-let gDelArm = false;
-$("#gDelete").addEventListener("click", e => {
-  if (!gDelArm) {
-    gDelArm = true; e.target.textContent = "もう一度おすと消えます";
-    setTimeout(() => { gDelArm = false; e.target.textContent = "この目標を消す"; }, 3000);
-    return;
-  }
-  st.goals = st.goals.filter(g => g.id !== gediting);
-  gDelArm = false; e.target.textContent = "この目標を消す";
-  save(); render(); closeSheet("#sheetG");
+$("#gDelete").addEventListener("click", () => {
+  const g = st.goals.find(x => x.id === gediting); if (!g) return;
+  askConfirm("この目標を消しますか", g.title, () => {
+    st.goals = st.goals.filter(x => x.id !== g.id);
+    save(); render(); closeSheet("#sheetG");
+  });
 });
 
 /* ---------- くりかえし通知 ---------- */
@@ -1568,16 +1560,12 @@ $("#rmSave").addEventListener("click", () => {
   save(); syncNow(); renderRem(); closeSheet("#sheetRem");
   setMsg(i >= 0 ? "変えました" : "追加しました");
 });
-let rmDelArm = false;
-$("#rmDelete").addEventListener("click", e => {
-  if (!rmDelArm) {
-    rmDelArm = true; e.target.textContent = "もう一度おす";
-    setTimeout(() => { if (rmDelArm) { rmDelArm = false; e.target.textContent = "この通知を消す"; } }, 3500);
-    return;
-  }
-  rmDelArm = false; e.target.textContent = "この通知を消す";
-  st.reminders = st.reminders.filter(x => x.id !== rmEditing);
-  save(); renderRem(); closeSheet("#sheetRem"); setMsg("消しました");
+$("#rmDelete").addEventListener("click", () => {
+  const r = st.reminders.find(x => x.id === rmEditing); if (!r) return;
+  askConfirm("この通知を消しますか", r.title, () => {
+    st.reminders = st.reminders.filter(x => x.id !== r.id);
+    save(); renderRem(); closeSheet("#sheetRem"); setMsg("消しました");
+  });
 });
 
 /* ---------- 控えの文字（圧縮） ---------- */
@@ -1643,11 +1631,12 @@ $("#doRestore").addEventListener("click", async () => {
     setMsg("読みこめませんでした。文字が途中で切れていないか確認してください。", true);
   }
 });
-let wipeArm = false;
-$("#wipe").addEventListener("click", e => {
-  if (!wipeArm) { wipeArm = true; e.target.textContent = "本当に消す？ もう一度おす"; setTimeout(() => { wipeArm = false; e.target.textContent = "ぜんぶ消して最初から"; }, 3500); return; }
-  st = seed(); wipeArm = false; e.target.textContent = "ぜんぶ消して最初から";
-  save(); applyTheme(); render(); setMsg("最初にもどしました");
+$("#wipe").addEventListener("click", () => {
+  askConfirm("ぜんぶ消して最初からにしますか",
+    "レベル・記録・予定・目標・メモがすべて消えます。元には戻せません。", () => {
+      st = normalize(seed());
+      save(); applyTheme(); render(); setMsg("最初にもどしました");
+    });
 });
 
 /* ---------- theme ---------- */

@@ -592,6 +592,8 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   touch-action:pan-y;                 /* 上下は端末まかせ、横なぞりは app.js が受けもつ */
 }
 .sheet.side.on{transform:translateX(0);box-shadow:-12px 0 40px rgba(10,8,20,.28)}
+/* 確認の小窓は、メモや目標の窓を開いたまま、その上に重ねて出す */
+#sheetC{z-index:43}
 .sidehead{display:flex;align-items:center;gap:11px}
 .xbtn{
   width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;
