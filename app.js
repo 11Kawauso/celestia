@@ -14,7 +14,7 @@ const DOW = ["日", "月", "火", "水", "木", "金", "土"];
 const CHARA = "セレスティア";
 /* キャラの絵。ファイルを置いたらここにパスを入れる（例："icons/celestia.png"）。
    空のあいだは「セ」の仮枠が出る。 */
-const CHARA_IMG = "";
+const CHARA_IMG = "chara/celestia.jpg";
 
 /* ---------- state ---------- */
 function seed() {
