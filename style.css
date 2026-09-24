@@ -370,16 +370,25 @@ main:not(.on-home) .homeonly{display:none}
 .edit svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---- calendar ---- */
-.calhead{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
-.calmon{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:19px;font-variant-numeric:tabular-nums}
+/* 月を横一列に並べた帯。1か月＝帯の幅ちょうど。止まるときは月の区切りに合う。
+   強くはらえば勢いのまま何か月か進む（scroll-snap-stop を normal にしてあるため）。 */
+.calwrap{position:relative}
+.calstrip{
+  display:flex;overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
+  scrollbar-width:none;
+}
+.calstrip::-webkit-scrollbar{display:none}
+.calpage{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:normal;
+  display:flex;flex-direction:column;gap:18px;padding:0 2px}
+.calmon{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:19px;font-variant-numeric:tabular-nums;
+  line-height:34px;text-align:center}   /* 高さは ‹ › のボタンにそろえる */
+.calprev,.calnext{position:absolute;top:0}
+.calprev{left:2px} .calnext{right:2px}
 .navb{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--ink2);background:var(--bg2);border:1px solid var(--line)}
 .navb:active{background:var(--bg3)}
 .navb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-/* 月を送るとき、日のマスは横へすべって出入りする。はみ出たぶんは左右だけ切る
-   （上下は切らない。金色の枠や小窓の目印が欠けないように）。 */
-.calbody{overflow-x:clip}
-#calGrid{touch-action:pan-y;will-change:transform}   /* マスとマスのすきまをなぞっても横に流れないように */
 .dow{text-align:center;font-size:12.5px;color:var(--ink3);padding:5px 0;letter-spacing:.05em}
 .dow.sun{color:var(--sun)} .dow.sat{color:var(--sat)}
 .cell{
@@ -388,7 +397,7 @@ main:not(.on-home) .homeonly{display:none}
   aspect-ratio:1/1.42;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
   padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
   transition:border-color .16s ease;        /* 長押しの金色の枠も、小窓と同じ速さで */
-  touch-action:pan-y;                       /* 横になぞっても画面が流れないように（日を渡り歩くため） */
+  touch-action:pan-x pan-y;                 /* 横は月の帯、縦は画面のスクロール。長押し中の横の動きは app.js が止める */
   /* 長押しで小窓を出すので、そのとき端末側の「コピー」や文字選択が割りこまないようにする */
   -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
 }

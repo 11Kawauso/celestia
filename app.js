@@ -725,12 +725,55 @@ function renderGoals() {
   [o, d].forEach(x => { x.style.display = "flex"; x.style.flexDirection = "column"; x.style.gap = "10px"; });
 }
 
+/* ---------- カレンダー ---------- */
+/* 月は横一列の帯に並べてあり、指でなぞると端末のスクロールそのままに流れる。
+   強くはらえば勢いで何か月か進み、止まるときは月の区切りにぴたりと合う（style.css の scroll-snap）。
+   並べるのは今月の前後 CAL_SPAN か月ずつ。中身を描くのは見ている月のまわり（前後 CAL_NEAR）だけで、
+   ほかは近づいたときに描く。見出し「2026年 9月」と曜日も月ごとに持つので、いっしょに流れる。 */
+const CAL_SPAN = 24, CAL_NEAR = 2;
+const calStrip = $("#calStrip");
+let calBase = null, calIdx = CAL_SPAN, calVer = 0;   // calBase は帯の左端の月。calVer が変わったら描き直す
 let calY, calM;
-(function () { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); })();
+const calMonthAt = i => { const d = new Date(calBase.getFullYear(), calBase.getMonth() + i, 1); return [d.getFullYear(), d.getMonth()]; };
+const reduceMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+/* 帯を作り直す。今月をまん中に置く（起動したときと、日付が変わったとき） */
+function buildCal() {
+  const n = new Date();
+  calBase = new Date(n.getFullYear(), n.getMonth() - CAL_SPAN, 1);
+  let html = "";
+  for (let i = 0; i <= CAL_SPAN * 2; i++) html += '<div class="calpage" data-i="' + i + '"></div>';
+  calStrip.innerHTML = html;
+  calIdx = CAL_SPAN; [calY, calM] = calMonthAt(calIdx);
+  calVer++;
+  drawCalNear();
+  calToIdx(calIdx, false);
+}
+/* 見ている月の位置へ帯を合わせる。タブを開いたとき、幅が変わったとき、‹ › で送るとき */
+function calToIdx(i, smooth) {
+  i = Math.max(0, Math.min(CAL_SPAN * 2, i));
+  const w = calStrip.clientWidth; if (!w) return;   // タブが隠れているあいだは幅が無い。開いたときに合わせる
+  calStrip.scrollTo({ left: i * w, behavior: smooth ? "smooth" : "auto" });
+}
+/* 見ている月のまわりで、古くなっている月だけ描き直す */
+function drawCalNear() {
+  for (let i = calIdx - CAL_NEAR; i <= calIdx + CAL_NEAR; i++) {
+    const p = calStrip.children[i];
+    if (!p || +p.dataset.v === calVer) continue;
+    const [y, m] = calMonthAt(i);
+    p.innerHTML = calPageHtml(y, m);
+    p.dataset.v = calVer;
+  }
+}
+/* データが変わったとき（予定を足した、受け取ったなど）に呼ぶ。遠くの月は近づいたときに描き直す */
 function renderCal() {
-  $("#calmon").textContent = calY + "年 " + (calM + 1) + "月";
-  $("#dowRow").innerHTML = DOW.map((d, i) =>
-    '<div class="dow ' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + d + "</div>").join("");
+  if (!calBase) { buildCal(); return; }
+  calVer++;
+  drawCalNear();
+}
+const CAL_DOW = DOW.map((d, i) =>
+  '<div class="dow ' + (i === 0 ? "sun" : i === 6 ? "sat" : "") + '">' + d + "</div>").join("");
+/* 1か月ぶん。見出し・曜日・日のマス（いつも6行42マス） */
+function calPageHtml(calY, calM) {
   const first = new Date(calY, calM, 1), last = new Date(calY, calM + 1, 0);
   const tk = keyOf(new Date());
   let html = "";
@@ -760,8 +803,21 @@ function renderCal() {
   }
   // 月によって行数が変わると下のヘルプボタンが動くので、いつも6行（42マス）にそろえる
   for (let i = first.getDay() + last.getDate(); i < 42; i++) html += '<div class="cell pad"></div>';
-  $("#calGrid").innerHTML = html;
+  return '<div class="calmon">' + calY + "年 " + (calM + 1) + "月</div>" +
+    '<div><div class="grid">' + CAL_DOW + '</div><div class="grid calgrid" style="margin-top:4px">' + html + "</div></div>";
 }
+/* 流れているあいだ、いま見ている月（calY / calM）を追いかけ、近くの月を描いておく */
+calStrip.addEventListener("scroll", () => {
+  const w = calStrip.clientWidth; if (!w) return;
+  const i = Math.round(calStrip.scrollLeft / w);
+  if (i === calIdx) return;
+  calIdx = i; [calY, calM] = calMonthAt(i);
+  closePop();
+  drawCalNear();
+}, { passive: true });
+window.addEventListener("resize", () => calToIdx(calIdx, false));
+$("#prevM").addEventListener("click", () => calToIdx(calIdx - 1, !reduceMotion()));
+$("#nextM").addEventListener("click", () => calToIdx(calIdx + 1, !reduceMotion()));
 
 /* ---------- 記録 ---------- */
 /* 数字は「始めてから何日目」と「早起きの連続」。グラフは30日ぶんの達成数で、
@@ -1286,7 +1342,7 @@ function underFinger(x, y) {
     const c = el.closest(".cell[data-act='day']");
     if (c) return { cell: c };
     if (el.classList.contains("pad")) return { off: 1 };   // 月の頭とお尻の空きマス
-    if (el.id === "calGrid") gap = true;
+    if (el.classList.contains("calgrid")) gap = true;
   }
   return gap ? {} : { off: 1 };
 }
@@ -1302,7 +1358,7 @@ function endHold() {
   closePop();                                   // なぞり終わりに最後の日が残らないように
 }
 
-const calGrid = $("#calGrid");
+const calGrid = calStrip;   // 日のマスの受け持ちは、月の帯全体でまとめて受ける
 calGrid.addEventListener("pointerdown", e => {
   const cell = dayCellOf(e); if (!cell) return;
   holdFrom = { x: e.clientX, y: e.clientY };
@@ -1327,6 +1383,9 @@ calGrid.addEventListener("pointermove", e => {
       Math.abs(e.clientY - holdFrom.y) > HOLD_SLOP) stopHold();
 });
 ["pointerup", "pointercancel"].forEach(t => calGrid.addEventListener(t, endHold));
+/* 長押しの小窓が出ているあいだは、横に動かしても帯を流さない（日を渡り歩くための動き）。
+   小窓は動かずに押しつづけたときだけ出るので、この時点ではまだ流れはじめていない。 */
+calGrid.addEventListener("touchmove", e => { if (holding && e.cancelable) e.preventDefault(); }, { passive: false });
 /* 長押しで小窓を出したときは、指を離したときの一押しをここで止める。
    止めないと、そのまま日の画面まで開いてしまう。
    指が別の日へ動いていると一押し自体が来ないこともあるので、
@@ -1353,89 +1412,6 @@ calGrid.addEventListener("pointerout", e => {
 window.addEventListener("resize", placePop);
 window.addEventListener("scroll", placePop, true);
 
-/* 月を送る。dir は +1（次の月）／-1（前の月）。
-   いまの表を送る向きへすべらせて消し、次の月を反対側からすべりこませる。
-   from は指でなぞって動かしていた位置（px）。そこから続けて消えていく。
-   曜日の並びは月が変わっても同じなので、動かすのは日のマス（#calGrid）だけ。 */
-let calBusy = false;
-function shiftMonth(dir, from) {
-  const step = () => {
-    calM += dir;
-    if (calM < 0) { calM = 11; calY--; }
-    if (calM > 11) { calM = 0; calY++; }
-    closePop(); renderCal();
-  };
-  // 動きを減らす設定の端末では、すべらせずに切りかえるだけ
-  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    calGrid.style.transform = calGrid.style.opacity = ""; step(); return;
-  }
-  if (calBusy) return;
-  calBusy = true;
-  const w = calGrid.clientWidth * 0.5;
-  const x0 = from || 0, o0 = +(calGrid.style.opacity || 1);
-  const out = calGrid.animate(
-    [{ transform: "translateX(" + x0 + "px)", opacity: o0 }, { transform: "translateX(" + (-dir * w) + "px)", opacity: 0 }],
-    { duration: 130, easing: "ease-in", fill: "forwards" });
-  // 動きの終わりの知らせが来ないこと（画面が隠れていて動きが止まるなど）もあるので、
-  // 時間でも区切る。月が送られないまま、ボタンもなぞりも効かなくなるのを防ぐ。
-  let swapped = false;
-  const swap = () => {
-    if (swapped) return; swapped = true;
-    step();
-    calGrid.style.transform = calGrid.style.opacity = "";
-    const inn = calGrid.animate(
-      [{ transform: "translateX(" + (dir * w) + "px)", opacity: 0 }, { transform: "translateX(0)", opacity: 1 }],
-      { duration: 220, easing: "cubic-bezier(.2,.9,.3,1)", fill: "backwards" });
-    out.cancel();                                  // 入れかえてから外す（1コマも元の位置に戻らないように）
-    $("#calmon").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
-    inn.onfinish = inn.oncancel = () => { calBusy = false; };
-    setTimeout(() => { calBusy = false; }, 300);
-  };
-  out.onfinish = swap;
-  setTimeout(swap, 200);
-}
-
-/* 横になぞって月を送る。指に合わせて表が動き、SWIPE_GO だけ動かすか、素早くはらえば送る。
-   届かなければ元の位置へ戻す。縦の動きは画面のスクロールにまかせる（表とマスは touch-action:pan-y）。
-   長押しの小窓が出ているあいだは、横の動きは日を渡り歩くためのものなので送らない。 */
-const SWIPE_SLOP = 12, SWIPE_GO = 60;
-let sw = null, swipeEndAt = 0;
-calGrid.addEventListener("pointerdown", e => {
-  if (calBusy || (e.pointerType === "mouse" && e.button !== 0)) return;
-  sw = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), dx: 0, on: false };
-});
-calGrid.addEventListener("pointermove", e => {
-  if (!sw || e.pointerId !== sw.id || holding) return;
-  const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
-  if (!sw.on) {
-    if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) < Math.abs(dy) * 1.2) return;   // まだ横と決まらない
-    sw.on = true;
-    stopHold(); clearTimeout(hoverTimer); closePop();
-    try { calGrid.setPointerCapture(e.pointerId); } catch (err) {}   // マウスで表の外へ出ても追いかける
-  }
-  sw.dx = dx;
-  calGrid.style.transform = "translateX(" + dx + "px)";
-  calGrid.style.opacity = String(1 - Math.min(Math.abs(dx) / calGrid.clientWidth, 1) * 0.6);
-});
-function swipeEnd(cancel) {
-  if (!sw) return;
-  const s = sw; sw = null;
-  if (!s.on) return;
-  swipeEndAt = Date.now();                       // 指を離したときの一押しで、日の画面が開かないように
-  const fast = Math.abs(s.dx) / Math.max(1, Date.now() - s.t) > 0.5 && Math.abs(s.dx) > 30;
-  if (!cancel && (Math.abs(s.dx) > SWIPE_GO || fast)) { shiftMonth(s.dx < 0 ? 1 : -1, s.dx); return; }
-  calGrid.animate(
-    [{ transform: "translateX(" + s.dx + "px)", opacity: +(calGrid.style.opacity || 1) }, { transform: "translateX(0)", opacity: 1 }],
-    { duration: 180, easing: "cubic-bezier(.2,.9,.3,1)" });
-  calGrid.style.transform = calGrid.style.opacity = "";
-}
-calGrid.addEventListener("pointerup", () => swipeEnd(false));
-calGrid.addEventListener("pointercancel", () => swipeEnd(true));
-calGrid.addEventListener("click", e => {
-  if (Date.now() - swipeEndAt > 400) return;
-  e.stopPropagation(); e.preventDefault();
-}, true);
-
 /* ---------- tabs ---------- */
 $$(".tab").forEach(t => t.addEventListener("click", () => {
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
@@ -1445,11 +1421,10 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") paintBackup();
+  if (t.dataset.v === "cal") calToIdx(calIdx, false);   // 隠れていたあいだは幅が無く、位置を合わせられていない
   if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
   if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
 }));
-$("#prevM").addEventListener("click", () => shiftMonth(-1));
-$("#nextM").addEventListener("click", () => shiftMonth(1));
 
 /* ---------- goal editor ---------- */
 let gediting = null, gdraft = null;
@@ -2012,7 +1987,7 @@ render();
 let lastDay = keyOf(new Date());
 setInterval(() => {
   const k = keyOf(new Date());
-  if (k !== lastDay) { lastDay = k; const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); }
+  if (k !== lastDay) { lastDay = k; buildCal(); }   // 日付が変わったら、今月をまん中に並べ直す
   updateSpeech(new Date());
   render();
 }, 60000);

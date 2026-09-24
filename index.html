@@ -39,14 +39,12 @@
 
     <!-- CALENDAR -->
     <section class="view" id="v-cal">
-      <div class="calhead">
-        <button class="navb" id="prevM" aria-label="前の月"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <div class="calmon" id="calmon"></div>
-        <button class="navb" id="nextM" aria-label="次の月"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-      <div class="calbody">
-        <div class="grid" id="dowRow"></div>
-        <div class="grid" id="calGrid" style="margin-top:4px"></div>
+      <!-- 月を横一列に並べた帯。中身は app.js の buildCal が入れる。
+           ‹ › は帯の上に浮かせてあり、流れるのは見出しから下のマスまで -->
+      <div class="calwrap">
+        <div class="calstrip" id="calStrip"></div>
+        <button class="navb calprev" id="prevM" aria-label="前の月"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="navb calnext" id="nextM" aria-label="次の月"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
       <div class="helprow"><button class="helpbtn" data-act="help" data-help="n-cal" aria-controls="n-cal" aria-expanded="false" aria-label="説明を見る">?</button></div>
       <div class="helptext" id="n-cal"><div class="note">日曜と祝日の日付は赤、土曜は青。枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div></div>
