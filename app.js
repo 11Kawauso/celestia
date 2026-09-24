@@ -1017,8 +1017,15 @@ $("#mWakeTime").innerHTML = WAKE.map(w =>
   '<button class="pill" data-t="' + w.time + '">' + wakeHour(w.time) +
   '時<span class="pexp">EXP+' + w.exp + "</span></button>").join("");
 
+/* 朝の受け取れる時間（5時〜いちばん遅い9時）のあいだは、時刻を変えられない。
+   起きた時間を見てから、その朝の目標を選び直せないようにするため（前の晩までに決めておく）。 */
+const WAKE_LOCK_TO = Math.max(...WAKE.map(w => hm(w.time)));
+const wakeLocked = () => { const d = new Date(), cur = d.getHours() * 60 + d.getMinutes(); return cur >= CLAIM_FROM && cur < WAKE_LOCK_TO; };
 function paintDraft() {
-  $$("#mWakeTime .pill").forEach(p => p.classList.toggle("on", p.dataset.t === wakeDraft));
+  const lock = wakeLocked();
+  $$("#mWakeTime .pill").forEach(p => { p.classList.toggle("on", p.dataset.t === wakeDraft); p.disabled = lock; });
+  $("#mSave").disabled = lock;
+  $("#mLockNote").hidden = !lock;
 }
 function openMission(m) {
   editing = m.id;
@@ -1026,11 +1033,12 @@ function openMission(m) {
   paintDraft(); openSheet("#sheetM");
 }
 $("#mWakeTime").addEventListener("click", e => {
-  const b = e.target.closest(".pill"); if (!b) return;
+  const b = e.target.closest(".pill"); if (!b || b.disabled) return;
   wakeDraft = b.dataset.t; paintDraft();
 });
 $("#mCancel").addEventListener("click", () => closeSheet("#sheetM"));
 $("#mSave").addEventListener("click", () => {
+  if (wakeLocked()) { paintDraft(); return; }   // 開いたまま5時をまたいだとき
   const m = st.missions.find(x => x.id === editing);
   if (m) Object.assign(m, wakeMission(m.id, wakeDraft));
   save(); render(); closeSheet("#sheetM");
