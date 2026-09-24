@@ -15,6 +15,11 @@ const CHARA = "セレスティア";
 /* キャラの絵。ファイルを置いたらここにパスを入れる（例："icons/celestia.png"）。
    空のあいだは「セ」の仮枠が出る。 */
 const CHARA_IMG = "chara/celestia.jpg";
+/* レベルの上限。ここまで来ると、セレスティアが本名を明かす（地上では天使はみな「セレスティア」と名乗り、
+   個人の名は天界でしか使わない。名の由来はセラフィム＝熾天使）。 */
+const MAX_LV = 100;
+const TRUE_NAME = "セラ・セレスティア";
+const charaName = lv => (lv >= MAX_LV ? TRUE_NAME : CHARA);
 
 /* ---------- state ---------- */
 function seed() {
@@ -63,8 +68,8 @@ function normalize(o) {
   o = asObj(o);
   const c = asObj(o.chara);   // 名前と絵はもう持たないので作り直す
   o.chara = {
-    level: Math.max(1, Math.floor(asNum(c.level, 1))),
-    exp: Math.max(0, Math.floor(asNum(c.exp, 0)))
+    level: Math.min(MAX_LV, Math.max(1, Math.floor(asNum(c.level, 1)))),
+    exp: asNum(c.level, 1) >= MAX_LV ? 0 : Math.max(0, Math.floor(asNum(c.exp, 0)))   // 上限ではEXPを溜めない
   };
   o.user = asStr(o.user).slice(0, 40);
   o.say = asStr(o.say);                      // 直前に言ったセリフ
@@ -201,26 +206,31 @@ function setMsg(t, bad) {
 
 /* ---------- level ---------- */
 const need = lv => 50 + (lv - 1) * 25;
+/* ランクは4つ。区切りは口調・呼び方の段階（notify-lines.js の tone）とそろえてある。
+   並びは天使の位の順（大天使 < 力天使 < 熾天使）。最後の熾天使は、セラの名の由来。 */
 function rankOf(lv) {
-  if (lv >= 50) return "熾天使";
-  if (lv >= 35) return "大天使";
-  if (lv >= 25) return "権天使";
-  if (lv >= 18) return "力天使";
-  if (lv >= 12) return "守護天使";
-  if (lv >= 6) return "翼を得し者";
+  if (lv >= 91) return "熾天使";
+  if (lv >= 61) return "力天使";
+  if (lv >= 31) return "大天使";
   return "見習い天使";
 }
+/* EXPを足す。上限（MAX_LV）に着いたら、それより上には上がらず、EXPも溜めない。
+   戻り値は「この一回で上限に着いたか」。本名を明かすセリフに切りかえるのに使う。 */
 function addExp(n) {
   const c = st.chara; c.exp += n; let up = 0;
-  while (c.exp >= need(c.level)) { c.exp -= need(c.level); c.level++; up++; }
+  while (c.level < MAX_LV && c.exp >= need(c.level)) { c.exp -= need(c.level); c.level++; up++; }
+  if (c.level >= MAX_LV) c.exp = 0;
   while (c.exp < 0 && c.level > 1) { c.level--; c.exp += need(c.level); }
   if (c.exp < 0) c.exp = 0;
   if (up > 0) levelUp();
+  return up > 0 && c.level >= MAX_LV;
 }
 let luTimer = null;
 function levelUp() {
   $("#luNum").textContent = st.chara.level;
-  $("#luSub").textContent = callName(st.chara.level) + "、おめでとう ／ " + rankOf(st.chara.level);
+  $("#luSub").textContent = st.chara.level >= MAX_LV
+    ? "私の名は、セラ ／ " + rankOf(st.chara.level)   // 上限に着いたときだけ、本名を明かす
+    : callName(st.chara.level) + "、おめでとう ／ " + rankOf(st.chara.level);
   const el = $("#levelup"); el.classList.add("on");
   clearTimeout(luTimer); luTimer = setTimeout(() => el.classList.remove("on"), 1900);
 }
@@ -410,12 +420,12 @@ function holidaysOf(y) {
 const holidayName = d => holidaysOf(d.getFullYear())[(d.getMonth() + 1) + "-" + d.getDate()] || "";
 
 /* ---------- セリフ ---------- */
-/* レベル＝親密度。上がるほど呼び方と口調がやわらぐ。
+/* レベル＝親密度。上がるほど呼び方と口調がやわらぐ。上限は Lv100（MAX_LV）。
    区切りは rankOf のランクの境目にそろえてある。
-     0: Lv1-5   見習い天使            「お前」・ぶっきらぼう
-     1: Lv6-17  翼を得し者／守護天使  「あんた」・少し丸い
-     2: Lv18-34 力天使／権天使        名前で呼ぶ・素直
-     3: Lv35-   大天使／熾天使        「ご主人様」・丁寧
+     0: Lv1-30   見習い天使  「貴様」・ぶっきらぼう
+     1: Lv31-60  大天使      名前で呼ぶ・少し丸い
+     2: Lv61-90  力天使      「ご主人」・素直
+     3: Lv91-100 熾天使      「ご主人様」・丁寧（Lv100 で本名「セラ」を明かす）
    文面を変えたいときは下の SPEECH だけ直せばよい。{you} は呼び方、{n} は残りの数。 */
 /* 段階と呼び方の決まりは notify-lines.js に置いてある。
    通知（アプリが閉じていても出る）と同じものを使いたいので、そちらを本家にした。 */
@@ -433,7 +443,7 @@ const OPEN_SCENES = [
 
 /* セリフ表。口調4段階 × 場面。
    ・各場面は配列。いくつ足してもよく、その中から1つがランダムに選ばれる
-   ・{you} は呼び方（お前／あんた／名前／ご主人様）、{n} は残りの数に置きかわる
+   ・{you} は呼び方（貴様／名前／ご主人／ご主人様）、{n} は残りの数に置きかわる
    ・場面のキー
        first        はじめてアプリを開いたとき（1度だけ）
        wakeClaim    1 早起きの報酬を受け取った
@@ -444,18 +454,19 @@ const OPEN_SCENES = [
        night        4 夜（21時〜0時）
        midnight     5 夜中（1時〜5時）
        holiday      7 土日・祝日
-       more         受け取りのセリフの後ろに足す（残りがあるときだけ） */
+       more         受け取りのセリフの後ろに足す（残りがあるときだけ）
+       trueName     Lv100 に着いて、本名を明かす（段階3にだけある。ほかの段階では着かないため） */
 const SPEECH = [
-  { /* 0 見習い天使（Lv1-5）：お前・ぶっきらぼう */
-    first:        ["……お前が私の主人か。まあいい、精々励め。",
-                   "ふん。私はセレスティア。お前のことは、まだ何も知らない。"],
+  { /* 0 見習い天使（Lv1-30）：貴様・ぶっきらぼう */
+    first:        ["……貴様が私の主人か。まあいい、精々励め。",
+                   "ふん。私はセレスティア。貴様のことは、まだ何も知らない。"],
     wakeClaim:    ["ふん。今日はやったようだな。",
                    "ほう、起きられたのか。……まあ、悪くない。"],
     missionClaim: ["それくらいはできて当然だろう。",
                    "ふん。持っていけ。"],
     weekClaim:    ["……七日、一度も寝坊しなかったのか。認めてやる。",
                    "ふん。一週間続いたか。持っていけ。"],
-    goalDone:     ["やり遂げたのか。……お前にしては上出来だ。",
+    goalDone:     ["やり遂げたのか。……貴様にしては上出来だ。",
                    "ふん。まぐれではないと、証明してみせろ。"],
     wakeLate:     ["また寝坊か。{you}に期待した私がばかだった。",
                    "……もう間に合わん。明日はどうする気だ。"],
@@ -467,8 +478,8 @@ const SPEECH = [
                    "休みだろうと朝は来る。分かっているな、{you}。"],
     more:         ["あと{n}つ残ってるぞ。"] },
 
-  { /* 1 翼を得し者・守護天使（Lv6-17）：あんた・少し丸い */
-    first:        ["……ふうん。あんたが、私の主人ね。"],
+  { /* 1 大天使（Lv31-60）：名前で呼ぶ・少し丸い */
+    first:        ["……ふうん。{you}が、私の主人ね。"],
     wakeClaim:    ["今日も起きられたのね。……悪くないわ。",
                    "おはよう。ほら、受け取っていきなさい。"],
     missionClaim: ["ちゃんとやったのね。えらいじゃない。",
@@ -487,7 +498,7 @@ const SPEECH = [
                    "休みだからって、朝寝坊は別の話よ。"],
     more:         ["あと{n}つ残ってるわよ。"] },
 
-  { /* 2 力天使・権天使（Lv18-34）：名前で呼ぶ・素直 */
+  { /* 2 力天使（Lv61-90）：ご主人・素直 */
     first:        ["{you}。これからよろしくね。"],
     wakeClaim:    ["{you}、今日もちゃんと起きられたね。えらい。",
                    "{you}、おはよう。今日も会えてうれしい。"],
@@ -507,8 +518,9 @@ const SPEECH = [
                    "休みの日でも会いに来てくれるんだ。うれしい。"],
     more:         ["あと{n}つ受け取れるよ。"] },
 
-  { /* 3 大天使・熾天使（Lv35-）：ご主人様・丁寧 */
+  { /* 3 熾天使（Lv91-100）：ご主人様・丁寧 */
     first:        ["{you}。この身、あなたに捧げます。"],
+    trueName:     ["{you}……私の名は、セラ。セラ・セレスティアと申します。地上で名乗るのは、これが初めてです。"],
     wakeClaim:    ["{you}、今朝もご立派でした。",
                    "{you}、おはようございます。報酬をお受け取りください。"],
     missionClaim: ["{you}、見事でございます。",
@@ -590,12 +602,13 @@ function render() {
 
   // hero
   const c = st.chara;
-  $("#cname").textContent = CHARA;
+  $("#cname").textContent = charaName(c.level);   // Lv100 で本名になる
   $("#rank").textContent = rankOf(c.level);
   $("#lvnum").textContent = c.level;
   const nd = need(c.level);
   const C = 2 * Math.PI * 47;
-  const p = Math.max(0, Math.min(1, c.exp / nd));
+  const maxed = c.level >= MAX_LV;
+  const p = maxed ? 1 : Math.max(0, Math.min(1, c.exp / nd));   // 上限では輪を満たしたままにする
   // 輪は大（パネルの中）と小（ホーム右上）のふたつ。どちらも同じ値で動かす
   $$(".rfill").forEach(r => {
     r.setAttribute("stroke-dasharray", C.toFixed(1));
@@ -604,8 +617,8 @@ function render() {
   $("#minilv").textContent = c.level;
   // 棘は、輪の光が自分の位置を通りすぎたぶんだけ金色になる（レベルが上がればまた消える）
   $$(".spikes path").forEach(sp => sp.classList.toggle("on", p >= +sp.dataset.at));
-  $("#expnow").textContent = c.exp + " / " + nd + " EXP";
-  $("#expneed").textContent = "次のレベルまで あと " + (nd - c.exp);
+  $("#expnow").textContent = maxed ? "MAX" : c.exp + " / " + nd + " EXP";
+  $("#expneed").textContent = maxed ? "最大レベル" : "次のレベルまで あと " + (nd - c.exp);
 
   // キャラの絵とセリフ
   // 枠の高さは絵に合わせて決まるので、毎分の描き直しで作り直さない（一瞬つぶれて画面が跳ねる）
@@ -1189,16 +1202,18 @@ document.addEventListener("click", e => {
     const m = st.missions.find(x => x.id === id); if (!m) return;
     const now = new Date();
     if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
-    toggleDone(m.id, keyOf(now), true); addExp(m.exp);   // 受け取ったら取り消せない
-    say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
+    toggleDone(m.id, keyOf(now), true);                  // 受け取ったら取り消せない
+    if (addExp(m.exp)) say("trueName", now);             // この一回で Lv100 に着いた
+    else say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
     save(); render();
   }
   if (act === "weekclaim") {
     const now = new Date(), wk = weekShown(now);
     // 押すまでのあいだに日付がまたいで、別の週に変わっていたら受け取らない
     if (wk.state !== "ready" || wk.mk !== b.dataset.wk) { flash(b); return; }
-    st.wkClaim.push(wk.mk); addExp(WEEK_EXP);
-    say("weekClaim", now, moreTail(now));
+    st.wkClaim.push(wk.mk);
+    if (addExp(WEEK_EXP)) say("trueName", now);
+    else say("weekClaim", now, moreTail(now));
     save(); render();
   }
   if (act === "edit") { const m = st.missions.find(x => x.id === id); if (m) openMission(m); }
