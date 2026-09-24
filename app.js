@@ -73,6 +73,8 @@ function normalize(o) {
     exp: asNum(c.level, 1) >= MAX_LV ? 0 : Math.max(0, Math.floor(asNum(c.exp, 0)))   // 上限ではEXPを溜めない
   };
   o.user = asStr(o.user).slice(0, 40);
+  o.bdayGift = Math.max(0, Math.floor(asNum(o.bdayGift, 0)));   // 誕生日のプレゼントを最後に受け取った年
+  o.birthday = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(o.birthday) ? o.birthday : "";   // "MM-DD"。年は持たない
   o.say = asStr(o.say);                      // 直前に言ったセリフ
   const sd = asObj(o.said); o.said = {};     // 場面ごとに、最後に出した日
   Object.keys(sd).forEach(k => { if (typeof sd[k] === "string") o.said[k] = sd[k]; });
@@ -451,6 +453,7 @@ function callName(lv) { return NOTIFY.you(lv, st.user); }
    開いたときに出るものは「その日はじめて条件を満たしたとき」に一度だけ。
    重なった日は、この並びの上にあるものだけが出る（並べ替えれば優先順が変わる）。 */
 const OPEN_SCENES = [
+  "birthday",   //   設定した誕生日に、はじめて開いた（ほかの何よりも先）
   "streakLost", //   早起きが時間切れ。しかも前の日まで STREAK_MIN 日以上続いていた
   "lateRun",    //   早起きが時間切れ。しかも今日で LATE_MIN 日続けて寝坊
   "wakeLate",   // 2 早起きが時間切れになってから、はじめて開いた（上のどちらでもないとき）
@@ -469,6 +472,9 @@ const OPEN_SCENES = [
        weekClaim      今週の早起き（月〜日の7日）の報酬を受け取った
        goalDone     6 目標を達成した
        wakeLate     2 早起きが時間切れ
+       streakMark     早起きを受け取って、連続日数が STREAK_MARKS のどれかに届いた（{n} は連続日数）
+       birthday       設定した誕生日
+       birthdayGift   誕生日のプレゼント（EXP）を受け取った
        streakLost     早起きが STREAK_MIN 日以上続いていたのに、今日は時間切れ（{n} は途切れた連続日数）
        lateRun        今日で LATE_MIN 日以上続けて寝坊（{n} は続いている日数）
        night        4 夜（21時〜0時）
@@ -482,8 +488,14 @@ const SPEECH = [
   { /* 0 見習い天使（Lv1-30）：貴様・冷たく、見張る側 */
     first:        ["……私はセレスティア。今日から貴様を見ている。",
                    "貴様が今日からの主か。……精々、励め。"],
+    birthday:     ["……今日は{you}の生まれた日か。祝ってやらんこともない。",
+                   "誕生日か。……寿命がひとつ進んだな。大事に使え。"],
+    birthdayGift: ["……受け取れ。私からだ。礼はいらん。",
+                   "持っていけ。……今日だけだぞ。"],
     wakeClaim:    ["……起きたか。持っていけ。",
                    "朝に間に合ったか。……それでいい。"],
+    streakMark:   ["……{n}日続けて起きたか。少しは、見どころがある。",
+                   "{n}日連続だ。……悪くない。"],
     missionClaim: ["……それくらいは当然だ。",
                    "受け取れ。"],
     weekClaim:    ["……七日、一度も寝坊しなかったか。認めてやる。",
@@ -506,8 +518,14 @@ const SPEECH = [
 
   { /* 1 大天使（Lv31-60）：名前で呼ぶ・そっけないが、認めている */
     first:        ["……{you}、か。覚えておこう。"],
+    birthday:     ["{you}、誕生日だな。……おめでとう。",
+                   "今日は{you}の生まれた日か。……一年、よく生きた。"],
+    birthdayGift: ["受け取れ、{you}。……私からの祝いだ。",
+                   "……たいしたものではない。だが、受け取ってくれ。"],
     wakeClaim:    ["{you}。今朝も起きたか。……それでいい。",
                    "おはよう、{you}。受け取れ。"],
+    streakMark:   ["{n}日続いたな、{you}。……よくやっている。",
+                   "連続{n}日だ。……見ていたぞ。"],
     missionClaim: ["よくやった、{you}。",
                    "……悪くない。持っていけ。"],
     weekClaim:    ["一週間、毎朝起きたな。……少し、見直した。",
@@ -530,8 +548,14 @@ const SPEECH = [
 
   { /* 2 力天使（Lv61-90）：ご主人・硬い口調のまま、仕える側として尽くす */
     first:        ["{you}。……これからも、そばにいる。"],
+    birthday:     ["誕生日おめでとう、{you}。……この日に会えて、うれしい。",
+                   "{you}が生まれた日だな。……祝わせてくれ。"],
+    birthdayGift: ["{you}、これは私から。……生まれてきてくれて、ありがとう。",
+                   "受け取ってくれ。……来年も、祝わせてほしい。"],
     wakeClaim:    ["{you}、朝だ。……よく起きた。",
                    "おはよう、{you}。今朝も会えたな。"],
+    streakMark:   ["{n}日連続だ、{you}。……誇っていい。",
+                   "{you}、{n}日続けて会えている。……うれしい。"],
     missionClaim: ["見事だ、{you}。",
                    "……さすがだ。受け取ってくれ。"],
     weekClaim:    ["一週間、欠かさず起きたな。……誇っていい、{you}。",
@@ -554,9 +578,15 @@ const SPEECH = [
 
   { /* 3 熾天使（Lv91-100）：ご主人様・丁寧だが、短く静か */
     first:        ["{you}。……この身、あなたのそばに。"],
+    birthday:     ["{you}、お誕生日おめでとうございます。……あなたが生まれた日に、感謝を。",
+                   "今日は{you}のお生まれになった日。……この一年も、おそばにおります。"],
+    birthdayGift: ["{you}、私からの贈り物です。……どうか、お受け取りください。",
+                   "ささやかですが、お納めください。……あなたが生まれた日に。"],
     trueName:     ["{you}……私の名は、セラ。セラ・セレスティアと申します。地上で名乗るのは、これが初めてです。"],
     wakeClaim:    ["{you}。……おはようございます。今朝もお見事です。",
                    "{you}、どうぞお受け取りください。"],
+    streakMark:   ["{you}、{n}日続けてのお目覚め。……お見事です。",
+                   "連続{n}日。……あなたの積み重ねを、誇りに思います。"],
     missionClaim: ["見事です、{you}。",
                    "……さすがです。お納めください。"],
     weekClaim:    ["{you}、七日間、一日も欠かさず。……ご立派です。",
@@ -592,6 +622,20 @@ function lateRunOf(m, now) {
   }
   return n;
 }
+/* 早起きの連続が、この日数に届いたら褒める */
+const STREAK_MARKS = [7, 14, 30, 50, 100, 200, 365, 500, 730, 1000];
+/* 今日が誕生日か。2月29日生まれは、うるう年でない年は2月28日に祝う */
+function isBirthday(now) {
+  if (!st.birthday) return false;
+  const md = pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+  if (md === st.birthday) return true;
+  const y = now.getFullYear(), leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  return st.birthday === "02-29" && md === "02-28" && !leap;
+}
+/* 誕生日のプレゼント。その日のあいだだけ、セリフの右端にボタンが出る。
+   受け取れるのは1年に1回（誕生日の設定を毎日「今日」に変えて、何度ももらえないように）。 */
+const BDAY_GIFT = 1000;
+const giftReady = now => isBirthday(now) && st.bdayGift !== now.getFullYear();
 let sceneN = {};   // 場面ごとの {n}（途切れた日数・寝坊の日数）。scenesDue が入れる
 function scenesDue(now) {
   const w = st.missions.find(m => m.type === "wake");
@@ -601,6 +645,7 @@ function scenesDue(now) {
   const was = late ? streakOf(w) : 0, run = late ? lateRunOf(w, now) : 0;
   sceneN = { streakLost: was, lateRun: run };
   const due = {
+    birthday: isBirthday(now),
     streakLost: late && was >= STREAK_MIN,
     lateRun:  late && run >= LATE_MIN,
     wakeLate: late,
@@ -689,6 +734,7 @@ function render() {
       : '<span class="rune">' + CHARA[0] + "</span>";
   }
   $("#speech").textContent = st.say;
+  $("#giftBtn").hidden = !giftReady(now);
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
@@ -717,6 +763,7 @@ function render() {
   renderGoals();
   renderCal();
   if ($("#userName").value !== st.user) $("#userName").value = st.user;
+  paintBday(); paintBdayLock();
   paintBackup();
 }
 
@@ -1030,10 +1077,12 @@ function openSheet(id) { $(id).classList.add("on"); paintScrim(); paintBar(); }
    一緒に閉じてしまわないように、閉じるのは自分の分だけにする。 */
 function closeSheet(id) {
   $(id).classList.remove("on");
+  if (id === "#sheetC") confirmClosed();
   paintScrim(); paintBar();
 }
 function closeSheets() {                       // 全部たたむ（タブを移ったときなど）
   $$(".sheet").forEach(x => x.classList.remove("on"));
+  confirmClosed();
   paintScrim(); paintBar();
 }
 /* シートの外を押したら閉じる。閉じるのはいちばん手前の1枚だけなので、
@@ -1086,16 +1135,26 @@ $("#mSave").addEventListener("click", () => {
   save(); render(); closeSheet("#sheetM");
 });
 /* 確認の小窓。消す前に一度だけ止める。中身を差しかえて他でも使える。 */
-let confirmFn = null;
-function askConfirm(title, name, fn) {
+/* opt は省いてよい。{ yes: "決める"（ボタンの文字。ふだんは「消す」）, warn: true（説明を赤字に）,
+   no: 関数（「やめる」や外を押して閉じたときに呼ぶ）} */
+let confirmFn = null, confirmNo = null;
+function askConfirm(title, name, fn, opt) {
+  opt = opt || {};
   $("#cTitle").textContent = title;
   $("#cName").textContent = name;
-  confirmFn = fn;
+  $("#cName").classList.toggle("warn", !!opt.warn);
+  $("#cYes").textContent = opt.yes || "消す";
+  confirmFn = fn; confirmNo = opt.no || null;
   openSheet("#sheetC");
+}
+/* 「決める」を押さずに確認の窓が閉じた（やめる・外を押した・タブを移った） */
+function confirmClosed() {
+  const f = confirmNo; confirmNo = null; confirmFn = null;
+  if (f) f();
 }
 $("#cNo").addEventListener("click", () => closeSheet("#sheetC"));
 $("#cYes").addEventListener("click", () => {
-  const fn = confirmFn; confirmFn = null;
+  const fn = confirmFn; confirmFn = null; confirmNo = null;
   closeSheet("#sheetC");
   if (fn) fn();
 });
@@ -1270,7 +1329,9 @@ document.addEventListener("click", e => {
     if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
     toggleDone(m.id, keyOf(now), true);                  // 受け取ったら取り消せない
     if (m.type === "wake") st.wakeT[keyOf(now)] = m.time;   // 週の点数は、受け取ったときの時刻で決まる
+    const run = m.type === "wake" ? streakOf(m) : 0;      // 今日を含めた連続日数
     if (addExp(m.exp)) say("trueName", now);             // この一回で Lv100 に着いた
+    else if (STREAK_MARKS.includes(run)) say("streakMark", now, moreTail(now), run);   // 連続の節目
     else say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
     save(); render();
   }
@@ -1725,6 +1786,44 @@ function paintBackup() {
 
 /* ---------- settings ---------- */
 $("#userName").addEventListener("input", e => { st.user = e.target.value; save(); });
+$("#giftBtn").addEventListener("click", () => {
+  const now = new Date();
+  if (!giftReady(now)) { render(); return; }     // 日付をまたいでいたら、もう受け取れない
+  st.bdayGift = now.getFullYear();
+  if (addExp(BDAY_GIFT)) say("trueName", now);   // この一回で Lv100 に着いた
+  else say("birthdayGift", now);
+  save(); render();
+});
+/* 誕生日は月と日だけ。どちらかが空なら「決めていない」 */
+$("#bdMonth").innerHTML = '<option value="">月</option>' +
+  Array.from({ length: 12 }, (_, i) => '<option value="' + pad(i + 1) + '">' + (i + 1) + "月</option>").join("");
+$("#bdDay").innerHTML = '<option value="">日</option>' +
+  Array.from({ length: 31 }, (_, i) => '<option value="' + pad(i + 1) + '">' + (i + 1) + "日</option>").join("");
+function paintBday() {
+  // 毎分の描き直しでも呼ばれる。決める前は、選んでいる途中（確認の窓を開いているあいだも）を触らない。
+  // 決めてあった誕生日が「やりなおし」や読みこみで消えたときだけ、欄を空に戻す
+  if (!st.birthday && !$("#bdMonth").disabled) return;
+  const [m, d] = st.birthday ? st.birthday.split("-") : ["", ""];
+  $("#bdMonth").value = m; $("#bdDay").value = d;
+}
+/* 一度決めたら変えられない（毎日「今日」に変えて、プレゼントを何度ももらえないように） */
+function paintBdayLock() {
+  const fixed = !!st.birthday;
+  $("#bdMonth").disabled = $("#bdDay").disabled = fixed;
+  $("#bdLocked").hidden = !fixed;
+}
+["#bdMonth", "#bdDay"].forEach(id => $(id).addEventListener("change", () => {
+  if (st.birthday) { paintBday(); paintBdayLock(); return; }   // 決めたあとは変えられない
+  const m = $("#bdMonth").value; let d = $("#bdDay").value;
+  if (!m || !d) return;                                       // 片方だけ選んだ途中
+  const max = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][+m - 1];   // 2月は29日まで選べる
+  if (+d > max) { d = pad(max); $("#bdDay").value = d; }
+  askConfirm("誕生日を " + (+m) + "月" + (+d) + "日 に決めますか", "一度決めると、あとから変えられません。", () => {
+    st.birthday = m + "-" + d;
+    save(); paintBday(); paintBdayLock();
+    setMsg("誕生日を決めました");
+  }, { yes: "決める", warn: true, no: () => { $("#bdDay").value = ""; } });   // やめたら日だけ選び直し
+}));
 $("#copyBk").addEventListener("click", async () => {
   const t = $("#backup");
   try { await navigator.clipboard.writeText(t.value); setMsg("コピーしました"); }

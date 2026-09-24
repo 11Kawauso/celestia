@@ -245,6 +245,19 @@ main:not(.on-home) .homeonly{display:none}
   min-height:var(--speech-h);
   display:flex;align-items:center;
 }
+.speechtext{flex:1;min-width:0}
+/* 誕生日のプレゼント。セリフの右端に置き、ふわふわ動かして気づかせる */
+.giftbtn{
+  flex:none;margin-left:12px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:9px 10px 7px;border-radius:12px;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  background:linear-gradient(135deg,var(--dusk),var(--dawn));
+  box-shadow:0 4px 14px color-mix(in srgb,var(--dawn) 40%,transparent);
+  animation:giftbob 1.8s ease-in-out infinite;
+}
+.giftbtn svg{width:24px;height:24px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.giftbtn:active{transform:scale(.94)}
+@keyframes giftbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.giftbtn{animation:none}}
 
 /* ---- character panel ---- */
 .hero{
@@ -484,6 +497,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .btnrow>*{flex:1}
 .note{font-size:12px;color:var(--ink3);line-height:1.7}
 .note b{color:var(--ink2);font-weight:700}
+.note.warn{color:var(--bad)}   /* 確認の窓で、取り返しのつかないことを伝えるとき */
 .msg{font-size:12px;color:var(--ok);min-height:1.2em}
 
 /* ---- toggle ---- */

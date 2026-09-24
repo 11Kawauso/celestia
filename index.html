@@ -147,6 +147,16 @@
       </div>
 
       <div class="card">
+        <div class="lab">誕生日<button class="helpbtn" data-act="help" data-help="n-bday" aria-controls="n-bday" aria-expanded="false" aria-label="説明を見る">?</button></div>
+        <div class="timerow">
+          <select class="field" id="bdMonth" aria-label="誕生日の月"></select>
+          <select class="field" id="bdDay" aria-label="誕生日の日"></select>
+        </div>
+        <div class="note" id="bdLocked" hidden>決めた誕生日は変えられません。</div>
+        <div class="helptext" id="n-bday"><div class="note">誕生日にアプリを開くと、セレスティアからひとことと、プレゼントがあります。年は要りません。<br><b>一度決めると、あとから変えられません。</b></div></div>
+      </div>
+
+      <div class="card">
         <div class="lab">見た目<button class="helpbtn" data-act="help" data-help="n-theme" aria-controls="n-theme" aria-expanded="false" aria-label="説明を見る">?</button></div>
         <div class="pills" id="themePills">
           <button class="pill" data-t="auto">自動</button>
@@ -205,7 +215,14 @@
         </svg>
         <span class="minilv" id="minilv">1</span>
       </button>
-    <div class="speech" id="speech"></div>
+    <!-- 右端のプレゼントは、誕生日にだけ出る（受け取ったら消える） -->
+    <div class="speech">
+      <div class="speechtext" id="speech"></div>
+      <button class="giftbtn" id="giftBtn" hidden aria-label="誕生日のプレゼントを受け取る">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="10" width="17" height="10.5" rx="1.5"/><path d="M2.5 6.5h19V10h-19z"/><path d="M12 6.5v14"/><path d="M12 6.5C11 4 7.5 3 7 5.3c-.4 1.8 2.6 1.9 5 1.2zM12 6.5C13 4 16.5 3 17 5.3c.4 1.8-2.6 1.9-5 1.2z"/></svg>
+        <span>プレゼント</span>
+      </button>
+    </div>
     </div><!-- /.overlay -->
   </main>
 </div>
