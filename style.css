@@ -356,7 +356,6 @@ main:not(.on-home) .homeonly{display:none}
   width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
   border:1.5px solid var(--line);font-style:normal;font-size:14px;font-weight:700;line-height:1;color:var(--ink3);
 }
-.wkday i svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .wkday.done i{background:var(--dawn);border-color:transparent;color:var(--bg)}
 .wkday.miss i{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
 .wkday.today span{color:var(--dawn);font-weight:700}
@@ -558,15 +557,15 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   border-top:1px dashed var(--line);border-bottom:1px solid var(--line);
 }
 /* 押せる範囲は棒の上の空きも含めた縦いっぱい。細い棒でも指で押しやすいように */
-.bar{flex:1;min-width:0;display:flex;align-items:flex-end;justify-content:center;padding:0 1px}
-.bar:disabled{cursor:default}
-.bar i{
+.rbar{flex:1;min-width:0;display:flex;align-items:flex-end;justify-content:center;padding:0 1px}
+.rbar:disabled{cursor:default}
+.rbar i{
   display:block;width:100%;max-width:14px;min-height:2px;
   background:var(--dawn);border-radius:4px 4px 0 0;transition:opacity .15s ease;
 }
-.bar i.zero{background:var(--line);border-radius:0}   /* 0回の日。始める前の日（何も無し）と見分けるため */
-.bars.picking .bar i{opacity:.35}
-.bars.picking .bar.sel i{opacity:1}
+.rbar i.zero{background:var(--line);border-radius:0}   /* 0回の日。始める前の日（何も無し）と見分けるため */
+.bars.picking .rbar i{opacity:.35}
+.bars.picking .rbar.sel i{opacity:1}
 .barx{position:relative;height:14px;margin-top:-6px}
 .barx span{
   position:absolute;top:0;transform:translateX(-50%);

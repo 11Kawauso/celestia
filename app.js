@@ -39,11 +39,12 @@ function seed() {
    絞っておくことが、描画側が変なものを掴まない一番の守りになる。 */
 /* 早起きミッションは4つの時刻からえらぶ。EXPは時刻で決まり、早いほど多い。
    タイトル・曜日・時間のしばりも時刻から自動で決まるので、保存時に組み立てる。 */
+/* pt は「今週の早起き」の点数。その日に受け取ったときの時刻で決まる（st.wakeT に残す）。 */
 const WAKE = [
-  { time: "06:00", exp: 30 },
-  { time: "07:00", exp: 25 },
-  { time: "08:00", exp: 20 },
-  { time: "09:00", exp: 15 }
+  { time: "06:00", exp: 500, pt: 4 },
+  { time: "07:00", exp: 350, pt: 3 },
+  { time: "08:00", exp: 200, pt: 2 },
+  { time: "09:00", exp: 100, pt: 1 }
 ];
 const WAKE_DEFAULT = "07:00";
 const wakeAt = t => WAKE.find(w => w.time === t) || WAKE.find(w => w.time === WAKE_DEFAULT);
@@ -144,6 +145,9 @@ function normalize(o) {
 
   // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
   o.wkClaim = asArr(o.wkClaim).map(asDate).filter(Boolean);
+  // 早起きを受け取った日の、そのときの時刻（週の点数に使う）。これが無い昔の日は、いまの時刻で数える
+  const wt = asObj(o.wakeT); o.wakeT = {};
+  Object.keys(wt).forEach(k => { if (asDate(k) && WAKE.some(w => w.time === wt[k])) o.wakeT[k] = wt[k]; });
 
   /* 始めた日。記録タブの「◯日目」の起点。
      これを持っていない古いデータは、残っている記録のいちばん古い日を始めた日とみなす。 */
@@ -309,7 +313,18 @@ const sortKey = m => (m.mode && m.time ? m.time : "99:99");
 /* 月〜日の7日ぶん早起きできたら、まとめて報酬。
    寝坊した日（今日が時間切れになったときも）がひとつでもあれば、その週はもう達成できない。
    始める前の日が混じる週も数えない。受け取った週は、その月曜の日付を st.wkClaim に残す。 */
-const WEEK_EXP = 100;
+/* 週の報酬は、7日ぶんの点数の合計（7〜28点）で決まる。
+   毎日同じ時刻でそろえたときに 9時1000 / 8時2000 / 7時3500 / 6時5000 になるように決め、
+   あいだの点数はその間をまっすぐつなぐ（10の位で丸める）。 */
+const WEEK_EXP_AT = [[7, 1000], [14, 2000], [21, 3500], [28, 5000]];
+function weekExp(pt) {
+  for (let i = 1; i < WEEK_EXP_AT.length; i++) {
+    const [p0, e0] = WEEK_EXP_AT[i - 1], [p1, e1] = WEEK_EXP_AT[i];
+    if (pt <= p1) return Math.round((e0 + (e1 - e0) * (Math.max(pt, p0) - p0) / (p1 - p0)) / 10) * 10;
+  }
+  return WEEK_EXP_AT[WEEK_EXP_AT.length - 1][1];
+}
+const WEEK_MAX = weekExp(28);
 const mondayOf = d => { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - (m.getDay() + 6) % 7); return m; };
 /* 1週ぶんの様子。days の s は done（起きた）／miss（寝坊）／today（今日、まだ間に合う）／
    future（これから）／pre（始める前）。state は受け取りボタンの状態（claimState と同じ言葉）。 */
@@ -323,13 +338,13 @@ function weekInfo(mon, now) {
       : doneOn(w.id, k) ? "done"
       : k < tk || (k === tk && claimState(w, now, false) === "late") ? "miss"
       : k === tk ? "today" : "future";
-    days.push({ d: d, s: s });
+    days.push({ d: d, s: s, pt: s === "done" ? wakeAt(st.wakeT[k] || w.time).pt : 0 });
   }
-  const mk = keyOf(mon);
+  const mk = keyOf(mon), pt = days.reduce((a, x) => a + x.pt, 0);
   const state = st.wkClaim.includes(mk) ? "done"
     : days.every(x => x.s === "done") ? "ready"
     : days.some(x => x.s === "miss" || x.s === "pre") ? "late" : "lock";
-  return { mk: mk, days: days, state: state, last: false };
+  return { mk: mk, days: days, state: state, last: false, pt: pt, exp: weekExp(pt) };
 }
 /* 画面に出す週。先週をそろえたのに受け取り忘れていたら、月曜になってもそちらを先に出す */
 function weekShown(now) {
@@ -340,20 +355,21 @@ function weekShown(now) {
   return weekInfo(mon, now);
 }
 const WEEK_LABEL = { done: "受け取り済み", ready: "報酬を受け取る", late: "達成ならず", lock: "未クリア" };
-const ICO_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function renderWeek(now) {
   const wk = weekShown(now);
   $("#weekTitle").textContent = wk.last ? "先週の早起き" : "今週の早起き";
-  $("#weekExp").textContent = "EXP+" + WEEK_EXP;
+  // そろったら、その週の点数での報酬。まだなら、いちばん多くもらえる額（6時で7日）
+  $("#weekExp").textContent = wk.state === "ready" || wk.state === "done" ? "EXP+" + wk.exp : "最大 EXP+" + WEEK_MAX;
+  // 起きた日は、その日の点数を金の丸に入れる
   $("#weekCells").innerHTML = wk.days.map(x =>
     '<div class="wkday ' + x.s + '"><span>' + DOW[x.d.getDay()] + "</span><i>" +
-    (x.s === "done" ? ICO_CHECK : x.s === "miss" ? "×" : x.s === "pre" ? "−" : "") + "</i></div>").join("");
+    (x.s === "done" ? x.pt : x.s === "miss" ? "×" : x.s === "pre" ? "−" : "") + "</i></div>").join("");
   const miss = wk.days.find(x => x.s === "miss");
   const left = wk.days.filter(x => x.s === "today" || x.s === "future").length;
   $("#weekMsg").textContent =
-    wk.state === "done" ? "達成しました。また月曜から。"
-    : wk.state === "ready" ? "7日そろいました。"
-    : wk.state === "lock" ? "あと" + left + "日"
+    wk.state === "done" ? "達成しました（" + wk.pt + "点）。また月曜から。"
+    : wk.state === "ready" ? "7日そろいました。" + wk.pt + "点です。"
+    : wk.state === "lock" ? "あと" + left + "日（いま" + wk.pt + "点）"
     : miss ? DOW[miss.d.getDay()] + "曜に寝坊したので、今週は達成できません。月曜からまた挑戦できます。"
     : "始める前の日があるので、今週は数えません。月曜から挑戦できます。";
   const b = $("#weekClaim");
@@ -869,7 +885,7 @@ function renderRec() {
   $("#recTop").textContent = top + "回";
   $("#recBars").innerHTML = days.map((d, i) => {
     const k = keyOf(d), n = counts[i], pre = d < since;   // 始めた日より前は何も描かない
-    return '<button class="bar' + (pre ? " pre" : "") + '" data-k="' + k + '"' +
+    return '<button class="rbar' + (pre ? " pre" : "") + '" data-k="' + k + '"' +
       (pre ? " disabled" : "") + ' aria-label="' + md(d) + "（" + DOW[d.getDay()] + "） " + n + '回">' +
       (pre ? "" : '<i' + (n ? "" : ' class="zero"') + ' style="height:' + (n / top * 100).toFixed(1) + '%"></i>') + "</button>";
   }).join("");
@@ -887,22 +903,22 @@ function renderRec() {
 /* グラフの上の1行。マウスが乗っている棒か、押して選んだ棒があればその日、無ければ30日の合計 */
 function paintRecPick() {
   const k = recHover || recSel;
-  const b = k && $('#recBars .bar[data-k="' + k + '"]');
+  const b = k && $('#recBars .rbar[data-k="' + k + '"]');
   $("#recBars").classList.toggle("picking", !!b);
-  $$("#recBars .bar").forEach(x => x.classList.toggle("sel", x === b));
+  $$("#recBars .rbar").forEach(x => x.classList.toggle("sel", x === b));
   $("#recPick").innerHTML = b
     ? esc(b.getAttribute("aria-label")).replace(/(\d+)回$/, "<b>$1</b>回")
     : "この30日で <b>" + recTotal + "</b>回";
 }
 $("#recBars").addEventListener("click", e => {
-  const b = e.target.closest(".bar"); if (!b || b.disabled) return;
+  const b = e.target.closest(".rbar"); if (!b || b.disabled) return;
   recSel = recSel === b.dataset.k ? null : b.dataset.k;   // 同じ棒をもう一度おすと戻る
   paintRecPick();
 });
 // マウスは乗せるだけで見られるように。離れたら、押して選んだ棒（無ければ合計）に戻る
 $("#recBars").addEventListener("pointerover", e => {
   if (e.pointerType !== "mouse") return;
-  const b = e.target.closest(".bar");
+  const b = e.target.closest(".rbar");
   recHover = b && !b.disabled ? b.dataset.k : null; paintRecPick();
 });
 $("#recBars").addEventListener("pointerleave", e => {
@@ -1203,6 +1219,7 @@ document.addEventListener("click", e => {
     const now = new Date();
     if (claimState(m, now, !m.days.includes(now.getDay())) !== "ready") { flash(b); return; }
     toggleDone(m.id, keyOf(now), true);                  // 受け取ったら取り消せない
+    if (m.type === "wake") st.wakeT[keyOf(now)] = m.time;   // 週の点数は、受け取ったときの時刻で決まる
     if (addExp(m.exp)) say("trueName", now);             // この一回で Lv100 に着いた
     else say(m.type === "wake" ? "wakeClaim" : "missionClaim", now, moreTail(now));
     save(); render();
@@ -1212,7 +1229,7 @@ document.addEventListener("click", e => {
     // 押すまでのあいだに日付がまたいで、別の週に変わっていたら受け取らない
     if (wk.state !== "ready" || wk.mk !== b.dataset.wk) { flash(b); return; }
     st.wkClaim.push(wk.mk);
-    if (addExp(WEEK_EXP)) say("trueName", now);
+    if (addExp(wk.exp)) say("trueName", now);
     else say("weekClaim", now, moreTail(now));
     save(); render();
   }
