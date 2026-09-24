@@ -1414,6 +1414,7 @@ window.addEventListener("scroll", placePop, true);
 
 /* ---------- tabs ---------- */
 $$(".tab").forEach(t => t.addEventListener("click", () => {
+  const again = t.classList.contains("on");             // いま開いているタブをもう一度押した
   $$(".tab").forEach(x => x.classList.toggle("on", x === t));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
   closePop();
@@ -1423,7 +1424,8 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   if (t.dataset.v === "set") paintBackup();
   if (t.dataset.v === "cal") {                          // 開くたびに今月から（前に見ていた月には戻さない）
     const n = new Date();
-    calToIdx((n.getFullYear() - calBase.getFullYear()) * 12 + n.getMonth() - calBase.getMonth(), false);
+    // 開いたまま押しなおしたときは、今月まで流して戻す。別のタブから来たときは一瞬で合わせる
+    calToIdx((n.getFullYear() - calBase.getFullYear()) * 12 + n.getMonth() - calBase.getMonth(), again && !reduceMotion());
   }
   if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
   if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
