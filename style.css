@@ -376,6 +376,10 @@ main:not(.on-home) .homeonly{display:none}
 .navb:active{background:var(--bg3)}
 .navb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+/* 月を送るとき、日のマスは横へすべって出入りする。はみ出たぶんは左右だけ切る
+   （上下は切らない。金色の枠や小窓の目印が欠けないように）。 */
+.calbody{overflow-x:clip}
+#calGrid{touch-action:pan-y;will-change:transform}   /* マスとマスのすきまをなぞっても横に流れないように */
 .dow{text-align:center;font-size:12.5px;color:var(--ink3);padding:5px 0;letter-spacing:.05em}
 .dow.sun{color:var(--sun)} .dow.sat{color:var(--sat)}
 .cell{
