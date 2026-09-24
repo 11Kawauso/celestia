@@ -177,19 +177,6 @@
         <div class="lab">やりなおし</div>
         <button class="btn danger" id="wipe">ぜんぶ消して最初から</button>
       </div>
-
-      <!-- 【試し・あとで消す】画面の上だけ遅れて明るくなる件の見比べ（app.js の barTest） -->
-      <div class="card">
-        <div class="lab">試し：上の部分の戻り方</div>
-        <div class="note">それぞれ押して画面を出し、閉じたときに上の部分（時計のところ）がほかと同時に戻るか見てください。何も消えません。</div>
-        <div class="btnrow" id="barTests" style="flex-wrap:wrap">
-          <button class="btn" data-bt="1">1 いまのまま</button>
-          <button class="btn" data-bt="2">2 上の色を変えない</button>
-          <button class="btn" data-bt="3">3 一瞬で消す</button>
-          <button class="btn" data-bt="4">4 ゆっくり消す</button>
-          <button class="btn" data-bt="5">5 作り替え案</button>
-        </div>
-      </div>
     </section>
     </div><!-- /.scroller -->
 
@@ -235,13 +222,10 @@
 </nav>
 
 <div class="scrim" id="scrim"></div>
-<!-- 【試し・あとで消す】案A：画面に固定しない覆い（app.js の barTest 5） -->
-<div class="dimmer" id="dimmer"></div>
 
 <!-- mission sheet -->
 <div class="sheet" id="sheetM">
   <div class="sheetin">
-    <div class="grab"></div>
     <div class="sheettitle" id="mTitle">早起きミッションを編集</div>
 
     <!-- 早起きは固定ミッション。追加も削除もできず、時刻だけ変えられる。
@@ -386,7 +370,6 @@
 <!-- 確認の小窓。消す前（予定・メモ・目標・くりかえし通知・やりなおし）に出す -->
 <div class="sheet" id="sheetC">
   <div class="sheetin">
-    <div class="grab"></div>
     <div class="sheettitle" id="cTitle">消しますか</div>
     <div class="note" id="cName"></div>
     <div class="btnrow">
@@ -399,7 +382,6 @@
 <!-- goal sheet -->
 <div class="sheet" id="sheetG">
   <div class="sheetin">
-    <div class="grab"></div>
     <div class="sheettitle" id="gHead">目標を追加</div>
     <input class="field" id="gName" placeholder="例：アプリを完成させる">
     <div>
@@ -428,7 +410,6 @@
 <!-- メモ：書く・直す・消す -->
 <div class="sheet" id="sheetMEdit">
   <div class="sheetin">
-    <div class="grab"></div>
     <div class="sheettitle" id="mmHead">メモ</div>
     <input class="field" id="mmName" placeholder="タイトル">
     <div>
@@ -446,7 +427,6 @@
 <!-- くりかえし通知 -->
 <div class="sheet" id="sheetRem">
   <div class="sheetin">
-    <div class="grab"></div>
     <div class="sheettitle" id="rmHead">くりかえし通知</div>
     <input class="field" id="rmName" placeholder="例：タオルを替える" maxlength="60">
     <div>

@@ -892,16 +892,12 @@ $("#mmDelete").addEventListener("click", () => {
 });
 
 /* ---------- sheets ---------- */
-/* 後ろを暗くする覆いは、下から出るシートのときだけ。
-   右から出るパネルは画面いっぱいを覆う別ページなので、暗くする相手がいない。
-   しかも覆いをつけると、パネルがすべり込むまでの間だけ上端が暗く見え、
-   iPhone がその色をステータスバーに拾ったまま戻さなくなる。 */
-function paintScrim() {
-  const on = $$(".sheet.on:not(.side)").length > 0;
-  $("#scrim").classList.toggle("on", on && barTest !== 5);
-  $("#dimmer").classList.toggle("on", on && barTest === 5);   // 【試し】5 は画面に固定しない覆いを使う
-  if (!on) barTestDone();
-}
+/* 真ん中に出る窓（.sheet の side でないもの）を開いているあいだは、透明な幕で後ろを押せなくする。
+   幕に色は付けない。暗くするのは窓のまわりの影だけ（style.css の .sheet を見よ）。
+   画面全体を暗くすると、iPhone が上端に接した幕の色を時計のところに拾い、
+   閉じたあとも遅れて点滅するように戻るため（theme-color を変えなくても起きた）。
+   右から出るパネルは画面いっぱいの別ページなので、幕は要らない。 */
+function paintScrim() { $("#scrim").classList.toggle("on", $$(".sheet.on:not(.side)").length > 0); }
 function openSheet(id) { $(id).classList.add("on"); paintScrim(); paintBar(); }
 /* 1枚だけ閉じる。ミッションを保存したときに、その下のステータス画面まで
    一緒に閉じてしまわないように、閉じるのは自分の分だけにする。 */
@@ -919,7 +915,7 @@ function closeSheets() {                       // 全部たたむ（タブを移
    走っていないので、「開くための一押し」で開いたそばから閉じることがない。
    閉じるときはその一押しをここで止める。うしろのボタンまで押されないように。 */
 document.addEventListener("click", e => {
-  const top = $(".sheet.on:not(.side)") || $(".sheet.on");   // 下から出るシートのほうが手前
+  const top = $(".sheet.on:not(.side)") || $(".sheet.on");   // 真ん中の窓のほうが手前
   if (!top || e.target.closest(".pop,.popveil")) return;
   if (e.target.closest(".sheet") === top) return;            // 中を押したときは閉じない
   e.stopPropagation(); e.preventDefault();
@@ -1115,49 +1111,19 @@ $$(".sheet.side").forEach(el => {
   el.addEventListener("touchcancel", () => release(false));
 });
 
-/* 下から出るシートは、指で下へなぞって閉じる。上の短い棒はそのための取っ手。
-   取っ手からなら always、中身からのときは いちばん上まで戻っているときだけ受けつける
-   （読んでいる途中や、文字を書いている最中に閉じてしまわないように）。 */
-$$(".sheet:not(.side)").forEach(el => {
-  const SLOP = 12;     // これだけ動いてから、上か下かを決める
-  const CLOSE = 90;    // これだけ下へ行ったら、そのまま閉じる
-  let touch = null, y0 = 0, dy = 0, way = "";
-
-  el.addEventListener("touchstart", e => {
-    if (touch !== null || e.touches.length !== 1) return;
-    const grab = e.target.closest(".grab, .sheettitle");
-    if (!grab && (el.scrollTop > 0 || e.target.closest("input, textarea, select"))) return;
-    touch = e.touches[0].identifier; y0 = e.touches[0].clientY; dy = 0; way = "";
-  }, { passive: true });
-
-  el.addEventListener("touchmove", e => {
-    if (touch === null) return;
-    const t = Array.prototype.find.call(e.touches, x => x.identifier === touch);
-    if (!t) return;
-    const ay = t.clientY - y0;
-    if (!way) {
-      if (Math.abs(ay) < SLOP) return;
-      way = ay > 0 ? "shita" : "ue";
-      if (way === "shita") el.style.transition = "none";
-    }
-    if (way !== "shita") return;
-    dy = Math.max(0, ay);                              // 下へだけ動かす
-    el.style.transform = "translateY(" + dy + "px)";
-    if (e.cancelable) e.preventDefault();              // なぞっている間は中身を上下させない
-  }, { passive: false });
-
-  const release = commit => {
-    if (touch === null) return;
-    const shut = commit && way === "shita" && dy > CLOSE;
-    touch = null; way = ""; dy = 0;
-    el.style.transition = "";
-    if (shut) closeSheet("#" + el.id);   // 先にたたむ指示を出してから
-    el.style.transform = "";             // 手を離す。指の位置から続けてすべって消える
+/* 真ん中の窓は、iPhoneのキーボードが出たら、見えている範囲の真ん中へ寄せる。
+   キーボードは画面を縮めずに上から重なるだけなので、そのままだと窓の下半分（保存ボタンなど）が隠れる。
+   見えている範囲の高さと位置を CSS に渡し、style.css の .sheet がそれで置き場所を決める。 */
+if (window.visualViewport) {
+  const vv = window.visualViewport, root = document.documentElement;
+  const fitVV = () => {
+    root.style.setProperty("--vvh", vv.height + "px");
+    root.style.setProperty("--vvt", vv.offsetTop + "px");
   };
-  el.addEventListener("touchend", () => release(true));
-  // 端末に横取りされた（電話が来たなど）ときは、閉じずに元へ戻す
-  el.addEventListener("touchcancel", () => release(false));
-});
+  vv.addEventListener("resize", fitVV);
+  vv.addEventListener("scroll", fitVV);
+  fitVV();
+}
 
 /* ---------- global clicks ---------- */
 document.addEventListener("click", e => {
@@ -1654,46 +1620,14 @@ function applyTheme() {
   if (t === "auto" && window.matchMedia) barDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   paintBar();
 }
-/* iPhoneのステータスバーの色。ホーム画面に追加したアプリでは、この meta か
-   ページの中身から色が決まる。下から出るシートを開いているあいだは、後ろを暗くする
-   覆いと同じ色にそろえ、閉じたら元へ戻す。「閉じたら必ず塗り直させる」のが目的。
-   右から出るパネルは画面いっぱいの別ページなので、暗くはしない。 */
+/* iPhoneのステータスバーの色。テーマの地の色にそろえるだけで、窓を開いても変えない。
+   （実機で確かめたところ、いまのiPhoneはこの meta より、上端に接した固定の部品の色を拾う。
+   窓を開いても上端には何も置かないので、時計のところはいつも地の色のまま。） */
 let barDark = false;
 function paintBar() {
   const m = document.querySelector('meta[name="theme-color"]');
-  if (!m) return;
-  const dim = barTest !== 2 && barTest !== 5 && $$(".sheet.on:not(.side)").length > 0;   // 【試し】2・5 は上の色を変えない
-  m.setAttribute("content", barDark
-    ? (dim ? "#090914" : "#0d1020")     // 覆い rgba(10,8,20,.5) を重ねた色
-    : (dim ? "#7f7f88" : "#f3f5fc"));
+  if (m) m.setAttribute("content", barDark ? "#0d1020" : "#f3f5fc");
 }
-/* 【試し・あとで消す】シートを閉じたとき、画面の上（ステータスバー）だけ遅れて明るくなる件。
-   実機でしか起きないので、戻り方を4通り用意して見比べてもらう。
-     1 いまのまま（上の色を切りかえ、幕は0.22秒で消す）
-     2 上の色（theme-color）を変えない → これでも上が暗くなるなら、iPhoneは幕の色を拾っている
-     3 幕を一瞬で消す
-     4 上の色は先に戻し、幕はゆっくり（0.6秒）消す
-     5 作り替え案：覆いを「画面に固定」から「ページの中」に移す。iPhoneが上の色を拾う相手から外れるはず
-   試しの画面を閉じて1秒たったら、ふだんの動き（1）に戻る。 */
-let barTest = 1;
-$("#barTests").addEventListener("click", e => {
-  const b = e.target.closest("[data-bt]"); if (!b) return;
-  barTest = +b.dataset.bt;
-  const s = $("#scrim");
-  s.classList.toggle("instant", barTest === 3);
-  s.classList.toggle("slow", barTest === 4);
-  askConfirm("試し " + b.textContent, "「やめる」か「消す」で閉じて、上の部分がほかと同時に戻るか見てください。（何も消えません）", () => {});
-});
-// 試しの画面を閉じたら（ボタンでも外を押しても）、少し待ってからふだんの動きに戻す。
-// 閉じる動きの途中で戻すと、見比べたいところが変わってしまう。paintScrim から呼ぶ。
-function barTestDone() {
-  if (barTest === 1) return;
-  setTimeout(() => {
-    if ($$(".sheet.on:not(.side)").length) return;   // もう次の試しを開いていたら触らない
-    barTest = 1; $("#scrim").classList.remove("instant", "slow");
-  }, 1000);
-}
-
 /* ---------- 通知 ---------- */
 /* いまできるのは「許可をもらう」「テストで1通出す」まで。
    予定にあわせて自動で届く仕組み（サーバー）は、このあと足す。

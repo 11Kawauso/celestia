@@ -560,46 +560,43 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 #mmBody{min-height:160px;line-height:1.7;resize:vertical}
 
 /* ---- sheet ---- */
-/* シートを開いたときの、後ろを暗くする覆い。
-   閉じたら visibility で完全に消す。うすくするだけ（opacity:0）だと要素が残り、
-   iPhone がステータスバーの色をページから拾うときに、暗いままになってしまう。
-   visibility の切りかえは、消えるほうだけ遅らせて、うすくなる動きを最後まで見せる。 */
-.scrim{
-  position:fixed;inset:0;z-index:40;background:rgba(10,8,20,.5);
-  opacity:0;visibility:hidden;pointer-events:none;
-  transition:opacity .22s, visibility 0s .22s;
-}
-.scrim.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s, visibility 0s}
-/* 【試し・あとで消す】閉じるときの消え方（app.js の barTest を見よ） */
-.scrim.instant:not(.on){transition:none}
-.scrim.slow:not(.on){transition:opacity .6s, visibility 0s .6s}
-/* 【試し・あとで消す】案A。見た目は .scrim と同じで、位置の決め方だけ fixed ではなく absolute。
-   iPhone は「画面のいちばん上に固定された部品」の色を拾って時計のところを塗るので、そこから外す。
-   ページ自体は転がらない（body は画面の高さで止めてある）ので、absolute でも画面全体を覆える。 */
-.dimmer{
-  position:absolute;inset:0;z-index:40;background:rgba(10,8,20,.5);
-  opacity:0;visibility:hidden;pointer-events:none;
-  transition:opacity .22s, visibility 0s .22s;
-}
-.dimmer.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s, visibility 0s}
+/* 窓を開いているあいだ、後ろを押せなくする幕。色は付けない（app.js の paintScrim を見よ）。
+   画面全体を暗くすると、iPhone が上端に接した幕の色を時計のところに拾い、遅れて点滅する。 */
+.scrim{position:fixed;inset:0;z-index:40;visibility:hidden;pointer-events:none}
+.scrim.on{visibility:visible;pointer-events:auto}
+/* 窓の土台。右から出るパネル（.side）もここから始めて、下で形を変える。 */
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:42;
-  background:var(--bg);border-top:1px solid var(--line);
-  border-radius:20px 20px 0 0;
-  padding:16px 16px calc(env(safe-area-inset-bottom) + 18px);
-  transform:translateY(102%);transition:transform .26s cubic-bezier(.3,.9,.3,1);
-  max-height:88vh;overflow:auto;
+  background:var(--bg);overflow:auto;
+  transition:transform .26s cubic-bezier(.3,.9,.3,1);
 }
-/* 影は開いているときだけ。閉じたシートは画面のすぐ外で待っているので、
-   影を付けっぱなしにすると、ぼかしのぶんだけ画面の端ににじんで、
-   右と下がうっすら暗くなる（右に2枚、下に3枚ぶん重なる）。 */
-.sheet.on{transform:translateY(0);box-shadow:0 -12px 40px rgba(10,8,20,.28)}
+/* 真ん中に出る角丸の窓。ふわっと大きくなりながら出て、縮みながら消える。
+   暗くするのは窓のまわりの大きな影だけ。影は窓から離れるほど薄れるので、画面の上端までは届かない。
+   置き場所は「見えている範囲」の真ん中（--vvh・--vvt は app.js がキーボードに合わせて入れる）。
+   閉じた窓は visibility で消す。影を残したまま隠すと、ぼかしが画面ににじむ。 */
+.sheet:not(.side){
+  left:50%;right:auto;bottom:auto;
+  top:calc(var(--vvt, 0px) + var(--vvh, 100dvh) / 2);
+  width:min(440px, calc(100% - 32px));
+  max-height:calc(var(--vvh, 100dvh) - 48px);
+  border:1px solid var(--line);border-radius:20px;
+  padding:18px 16px;
+  opacity:0;visibility:hidden;
+  transform:translate(-50%,-50%) scale(.94);
+  transition:transform .18s ease, opacity .18s ease, visibility 0s .18s;
+}
+.sheet:not(.side).on{
+  opacity:1;visibility:visible;
+  transform:translate(-50%,-50%) scale(1);
+  transition:transform .24s cubic-bezier(.2,.9,.3,1.1), opacity .18s ease, visibility 0s;
+  box-shadow:0 18px 50px rgba(10,8,20,.32), 0 0 120px 40px rgba(10,8,20,.2);
+}
 /* 日付の詳細だけは、下からではなく右からすべって出す。
    画面いっぱいの別ページのあつかいなので、閉じるのは左上の×。 */
 .sheet.side{
-  top:0;max-height:none;z-index:41;              /* 下から出るシートは、この上に重ねる */
-  border-top:0;border-left:1px solid var(--line);border-radius:0;
-  padding-top:calc(env(safe-area-inset-top) + 14px);
+  top:0;max-height:none;z-index:41;              /* 真ん中の窓は、この上に重ねる */
+  border-left:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);
   transform:translateX(100%);
   touch-action:pan-y;                 /* 上下は端末まかせ、横なぞりは app.js が受けもつ */
 }
@@ -621,7 +618,6 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .dayform{flex:none;display:flex;flex-direction:column;gap:13px;
   padding-top:13px;border-top:1px solid var(--line)}
 .field:disabled{opacity:.45}   /* 通知がオフのあいだの通知時間 */
-.grab{width:36px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 2px}
 .sheettitle{font-family:"Shippori Mincho B1",serif;font-weight:800;font-size:17px}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{border:1px solid var(--line);background:var(--bg2);border-radius:99px;padding:6px 13px;font-size:13px;color:var(--ink2)}
