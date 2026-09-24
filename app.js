@@ -1243,7 +1243,7 @@ function placePop() {
     Math.max(13, Math.min(r.left + r.width / 2 - left, w - 13)) + "px";
 }
 $("#popVeil").addEventListener("click", closePop);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closePop(); closeViewer(); } });
 
 /* ---------- 日を長押しして、その日の中身を見る ---------- */
 /* 指では長押し、マウスでは重ねるだけ。押した日の上に小窓が出る。
@@ -1901,6 +1901,20 @@ if (window.matchMedia) {
   if (mq.addEventListener) mq.addEventListener("change", onChange);
   else if (mq.addListener) mq.addListener(onChange);
 }
+
+/* ---------- キャラを全画面で見る ---------- */
+/* 左上のボタンで、キャラの絵だけを画面いっぱいに出す。どこを押しても戻る。
+   絵がまだ無いあいだ（「セ」の仮枠）は、ボタンごと出さない。 */
+function openViewer() {
+  if (!CHARA_IMG) return;
+  const img = $("#viewerImg");
+  if (img.getAttribute("src") !== CHARA_IMG) { img.src = CHARA_IMG; img.alt = CHARA; }
+  $("#viewer").classList.add("on");
+}
+function closeViewer() { $("#viewer").classList.remove("on"); }
+$("#fullBtn").hidden = !CHARA_IMG;
+$("#fullBtn").addEventListener("click", openViewer);
+$("#viewer").addEventListener("click", closeViewer);
 
 /* ---------- boot ---------- */
 // 昔の書庫が画像を入れていた置き場。もう使わないので、残っていれば片づける

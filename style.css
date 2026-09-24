@@ -197,6 +197,19 @@ main:not(.on-home) .homeonly{display:none}
   filter:drop-shadow(0 2px 6px rgba(10,8,20,.45));
 }
 .minihalo:active{transform:scale(.93)}
+/* 左上の全画面ボタン。右上のゲージと左右対称の位置に置き、丸の中心の高さもそろえる
+   （ゲージは角から10px・大きさ48px なので、36px のこちらは上に6px足す）。
+   ゲージと同じく、転がらない層の上に浮かせる。 */
+.fullbtn{
+  position:absolute;left:26px;top:32px;
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  color:var(--ink2);border:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg2) 80%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  filter:drop-shadow(0 2px 6px rgba(10,8,20,.35));
+}
+.fullbtn:active{transform:scale(.93)}
+.fullbtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .minihalo .ring{position:absolute;inset:0;width:48px;height:48px}
 .miniface{fill:color-mix(in srgb,var(--bg2) 88%,transparent)}   /* 数字を読めるようにする下じき */
 .minilv{
@@ -631,6 +644,17 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .timerow .to{flex:none;color:var(--ink3);font-size:13px}   /* 始まり〜終わりの「〜」 */
 
 /* ---- level up ---- */
+/* キャラを全画面で見る。ヘッダーも下タブもセリフも覆って、絵だけを画面に収める。
+   地の色は画面と同じ。上端に接した部品の色が変わると、iPhone が時計のところを
+   塗り直して遅れて点滅するため（真ん中の窓と同じ理由）。 */
+.viewer{
+  position:fixed;inset:0;z-index:55;background:var(--bg);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  opacity:0;visibility:hidden;cursor:zoom-out;
+  transition:opacity .2s ease, visibility 0s .2s;
+}
+.viewer.on{opacity:1;visibility:visible;transition:opacity .2s ease, visibility 0s}
+.viewer img{width:100%;height:100%;object-fit:contain;display:block}
 .levelup{
   position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;
   opacity:0;visibility:hidden;transition:opacity .3s, visibility 0s .3s;   /* 覆いと同じ理由 */

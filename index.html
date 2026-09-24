@@ -183,6 +183,10 @@
     <!-- 転がらない層。.scroller と同じ形の箱をかぶせてあるので、中身の左右は絵とそろう。
          ホーム以外のタブでは CSS がまるごとしまう。 -->
     <div class="overlay homeonly">
+    <!-- 左上の全画面ボタン。押すとキャラの絵だけを画面いっぱいに出す（下の #viewer） -->
+    <button class="fullbtn" id="fullBtn" aria-label="キャラを全画面で見る">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
     <!-- 右上の小さいゲージ。押すとレベルとミッションが右から出てくる。
          輪の形と色の決まりは大きいほうと同じ（.rbg / .rfill / .spikes）。
          グラデーションは取り違えないよう、こちらは haloGradS という別の名前にしてある。 -->
@@ -468,6 +472,9 @@
   <div class="popbody" id="popBody"></div>
   <div class="poparrow" id="popArrow"></div>
 </div>
+
+<!-- キャラを全画面で見る。どこを押しても戻る -->
+<div class="viewer" id="viewer" role="dialog" aria-label="キャラを全画面で見る"><img id="viewerImg" alt=""></div>
 
 <div class="levelup" id="levelup">
   <div class="lucard">
