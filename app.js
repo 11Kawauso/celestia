@@ -451,7 +451,9 @@ function callName(lv) { return NOTIFY.you(lv, st.user); }
    開いたときに出るものは「その日はじめて条件を満たしたとき」に一度だけ。
    重なった日は、この並びの上にあるものだけが出る（並べ替えれば優先順が変わる）。 */
 const OPEN_SCENES = [
-  "wakeLate",   // 2 早起きが時間切れになってから、はじめて開いた
+  "streakLost", //   早起きが時間切れ。しかも前の日まで STREAK_MIN 日以上続いていた
+  "lateRun",    //   早起きが時間切れ。しかも今日で LATE_MIN 日続けて寝坊
+  "wakeLate",   // 2 早起きが時間切れになってから、はじめて開いた（上のどちらでもないとき）
   "night",      // 4 21時〜0時に、はじめて開いた
   "midnight",   // 5 1時〜5時に、はじめて開いた
   "holiday"     // 7 土日・祝日に、はじめて開いた
@@ -467,6 +469,8 @@ const OPEN_SCENES = [
        weekClaim      今週の早起き（月〜日の7日）の報酬を受け取った
        goalDone     6 目標を達成した
        wakeLate     2 早起きが時間切れ
+       streakLost     早起きが STREAK_MIN 日以上続いていたのに、今日は時間切れ（{n} は途切れた連続日数）
+       lateRun        今日で LATE_MIN 日以上続けて寝坊（{n} は続いている日数）
        night        4 夜（21時〜0時）
        midnight     5 夜中（1時〜5時）
        holiday      7 土日・祝日
@@ -488,6 +492,10 @@ const SPEECH = [
                    "……まぐれでないと、次で示せ。"],
     wakeLate:     ["寝坊か。……天罰を与えるほどでもない。",
                    "……もう間に合わん。明日は起きろ。"],
+    streakLost:   ["……{n}日続いていたのに、ここで寝坊か。",
+                   "{n}日の積み重ねを、一晩で崩したな。……明日、また積め。"],
+    lateRun:      ["{n}日続けて寝坊だ。……{you}、天罰が欲しいのか。",
+                   "……これで{n}日目だ。いいかげんにしろ。"],
     night:        ["今日は終わりだ。明日は起きろ、{you}。",
                    "夜だ。……さっさと休め。"],
     midnight:     ["{you}、まだ起きているのか。……寿命を削るな。",
@@ -508,6 +516,10 @@ const SPEECH = [
                    "……よくやった。今日は休め。"],
     wakeLate:     ["寝坊か、{you}。……明日がある。",
                    "間に合わなかったな。……気にしすぎるな。"],
+    streakLost:   ["{n}日続いていたのにな、{you}。……惜しい。",
+                   "……途切れたか。{n}日分は、無駄にはならん。"],
+    lateRun:      ["{n}日続けて寝坊だぞ、{you}。……何かあったのか。",
+                   "これで{n}日目だ。……明日こそ、起きろ。"],
     night:        ["今日はもう休め、{you}。明日の朝に会おう。",
                    "夜だ。……無理はするな。"],
     midnight:     ["{you}、まだ起きているのか。……体に障る。",
@@ -526,8 +538,12 @@ const SPEECH = [
                    "毎朝、{you}に会えた七日だった。……悪くなかった。"],
     goalDone:     ["やり遂げたな、{you}。……ずっと見ていた。",
                    "おめでとう。……私も、うれしい。"],
-    wakeLate:     ["{you}、おはよう。……そんな日もある。",
+    wakeLate:     ["{you}、寝坊か。……そんな日もある。",
                    "間に合わなかったな。……無理はするな。"],
+    streakLost:   ["{n}日も続いていたのに……。{you}、疲れていたのか。",
+                   "途切れたな。……だが、{n}日続けたのは本当だ。"],
+    lateRun:      ["{you}、{n}日続けて起きられていない。……体の具合が悪いのか。",
+                   "{n}日目だな。……責めはしない。明日、また会おう。"],
     night:        ["{you}、今日はもう休んでくれ。明日の朝、待っている。",
                    "おやすみ、{you}。……夜は、私が見張っておく。"],
     midnight:     ["{you}、まだ起きているのか。……頼むから、休んでくれ。",
@@ -547,8 +563,12 @@ const SPEECH = [
                    "この七日のお姿、しかと見届けました。お納めください。"],
     goalDone:     ["{you}、成し遂げられましたね。……心から、お祝いします。",
                    "あなたの歩みを、ずっと見ておりました。……おめでとうございます。"],
-    wakeLate:     ["{you}、おはようございます。……お疲れが出たのでしょう。",
+    wakeLate:     ["{you}、今朝はお休みでしたね。……お疲れが出たのでしょう。",
                    "今朝は間に合いませんでしたね。……お気になさらず。"],
+    streakLost:   ["{n}日続けてこられたのに……。{you}、どうかご無理なさらず。",
+                   "……途切れてしまいましたね。{n}日のお姿は、私が覚えております。"],
+    lateRun:      ["{you}、{n}日続けてお休みになっていますね。……お体が心配です。",
+                   "……{n}日目です。私はここで、お待ちしております。"],
     night:        ["{you}、今日はもうお休みください。夜は、私がお守りします。",
                    "おやすみなさいませ、{you}。また明日の朝に。"],
     midnight:     ["{you}、まだ起きていらしたのですか。……どうか、お休みください。",
@@ -559,11 +579,31 @@ const SPEECH = [
 ];
 
 /* いま条件を満たしていて、その日まだ出していない場面を、優先順に並べて返す。 */
+/* 寝坊のセリフを出し分けるしきい値。どちらも、ここを変えれば出る頻度が変わる。 */
+const STREAK_MIN = 3;   // これだけ続いていた早起きが途切れたら streakLost
+const LATE_MIN = 3;     // 今日を含めてこれだけ続けて寝坊したら lateRun
+/* 今日を含めて、何日続けて早起きを逃しているか（始めた日より前は数えない） */
+function lateRunOf(m, now) {
+  const d = new Date(now); let n = 0;
+  for (let i = 0; i < 400; i++) {
+    const k = keyOf(d);
+    if (k < st.since || doneOn(m.id, k)) break;
+    n++; d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+let sceneN = {};   // 場面ごとの {n}（途切れた日数・寝坊の日数）。scenesDue が入れる
 function scenesDue(now) {
   const w = st.missions.find(m => m.type === "wake");
   const h = now.getHours(), dow = now.getDay();
+  const late = !!w && claimState(w, now, false) === "late";
+  // 今日は受け取っていないので、streakOf は「きのうまで何日続いていたか」を返す
+  const was = late ? streakOf(w) : 0, run = late ? lateRunOf(w, now) : 0;
+  sceneN = { streakLost: was, lateRun: run };
   const due = {
-    wakeLate: !!w && claimState(w, now, false) === "late",
+    streakLost: late && was >= STREAK_MIN,
+    lateRun:  late && run >= LATE_MIN,
+    wakeLate: late,
     night:    h >= 21,               // 21時〜0時
     midnight: h >= 1 && h < 5,       // 1時〜5時
     holiday:  dow === 0 || dow === 6 || !!holidayName(now)
@@ -572,12 +612,12 @@ function scenesDue(now) {
   return OPEN_SCENES.filter(k => due[k] && st.said[k] !== today);
 }
 /* セリフを1つ選んで覚える。次の場面が来るまでこれが出つづける。 */
-function say(scene, now, tail) {
+function say(scene, now, tail, n) {
   const lv = st.chara.level;
   const list = SPEECH[toneOf(lv)][scene];
   if (!list || !list.length) return;
   let line = list[Math.floor(Math.random() * list.length)] + (tail || "");
-  st.say = line.replace(/\{you\}/g, callName(lv));
+  st.say = line.replace(/\{you\}/g, callName(lv)).replace(/\{n\}/g, n == null ? "" : n);
   st.said[scene] = keyOf(now);
   save();
 }
@@ -605,7 +645,7 @@ function updateSpeech(now) {
   }
   const due = scenesDue(now);
   if (!due.length) return;
-  say(due[0], now);
+  say(due[0], now, "", sceneN[due[0]]);
   // 同時に重なっていた下位の場面も、その日はもう出さない
   due.forEach(k => { st.said[k] = today; });
   save();
