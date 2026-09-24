@@ -1421,7 +1421,10 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
   if (t.dataset.v === "set") paintBackup();
-  if (t.dataset.v === "cal") calToIdx(calIdx, false);   // 隠れていたあいだは幅が無く、位置を合わせられていない
+  if (t.dataset.v === "cal") {                          // 開くたびに今月から（前に見ていた月には戻さない）
+    const n = new Date();
+    calToIdx((n.getFullYear() - calBase.getFullYear()) * 12 + n.getMonth() - calBase.getMonth(), false);
+  }
   if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
   if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
 }));
