@@ -210,19 +210,27 @@ main:not(.on-home) .homeonly{display:none}
 }
 .fullbtn:active{transform:scale(.93)}
 .fullbtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
-/* ゲージの下のミッションボタン。受け取れる報酬があるときだけ出る（app.js の render）。
-   36px の丸をゲージ（48px）の真下にそろえるため、右の余白はゲージより6px多い。
-   右上の赤い「!」で、受け取り待ちがあることを知らせる。 */
-.missionbtn{
+/* ゲージの下に縦に並ぶ丸いボタン（上から エピソード・ミッション）。見た目は左上の全画面ボタンと同じ。
+   36px の丸をゲージ（48px）の真下にそろえるため、右の余白はゲージより6px多い。 */
+.homebtn{
   align-self:flex-end;margin:12px 16px 0 0;position:relative;
   width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;
-  color:var(--dawn);border:1px solid var(--dawn);
+  color:var(--ink2);border:1px solid var(--line);
   background:color-mix(in srgb,var(--bg2) 80%,transparent);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   filter:drop-shadow(0 2px 6px rgba(10,8,20,.35));
 }
-.missionbtn:active{transform:scale(.93)}
-.missionbtn svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.homebtn + .homebtn{margin-top:10px}
+.homebtn:active{transform:scale(.93)}
+.homebtn svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+/* ミッションは、受け取れる報酬があるときだけ出る（app.js の render）。
+   金色にして、右上の赤い「!」で受け取り待ちがあることを知らせる。 */
+.missionbtn{color:var(--dawn);border-color:var(--dawn)}
+/* エピソードは、読んでいないものが解放されているときだけ右上に赤い点 */
+.homebtn.new::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:10px;height:10px;border-radius:50%;
+  background:#e0453f;border:1.5px solid var(--bg);
+}
 .missionbtn .bang{
   position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
   display:grid;place-items:center;background:#e0453f;color:#fff;
@@ -700,6 +708,22 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .dayscroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:13px}
 .dayform{flex:none;display:flex;flex-direction:column;gap:13px;
   padding-top:13px;border-top:1px solid var(--line)}
+/* エピソード。一覧の行はボタンなので、左寄せに戻す */
+.eprow{width:100%;text-align:left}
+/* 読む画面も上下に分ける。上（会話）だけが動き、下（次へ・選択肢）は動かない */
+#sheetEp{overflow:hidden}
+#sheetEp .sheetin{height:100%}
+.eplog{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px 8px}
+.epline{align-self:flex-start;max-width:86%;animation:epin .22s ease}
+.epwho{font-size:11px;color:var(--dawn);font-weight:700;letter-spacing:.06em;margin:0 0 3px 4px}
+.epsay{background:var(--bg2);border:1px solid var(--line);border-radius:4px 14px 14px 14px;
+  padding:10px 13px;font-size:14.5px;line-height:1.7;overflow-wrap:anywhere}
+.epface{font-size:11.5px;color:var(--ink3);margin:4px 0 0 6px}   /* 表情のメモ。顔の絵が入るまでの代わり */
+.epme{align-self:flex-end;max-width:80%;border-radius:14px 4px 14px 14px;padding:9px 13px;
+  font-size:14px;color:#fff;background:linear-gradient(135deg,var(--dusk),var(--dawn));animation:epin .22s ease}
+@keyframes epin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.epfoot{flex:none;display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.epchoice{text-align:left;padding:12px 14px}
 .field:disabled{opacity:.45}   /* 通知がオフのあいだの通知時間 */
 .pill:disabled,.btn:disabled{opacity:.45;cursor:default}   /* 早起きの時刻を変えられない朝の時間など */
 .locknote{margin-top:8px;color:var(--bad)}

@@ -215,8 +215,14 @@
         </svg>
         <span class="minilv" id="minilv">1</span>
       </button>
-    <!-- ゲージの下。受け取れる報酬があるときだけ出て、押すとレベルとミッションの画面を開く -->
-    <button class="missionbtn" id="openMission" hidden aria-label="受け取れる報酬があります。ミッションを見る">
+    <!-- ゲージの下に、上から エピソード・ミッション の順で並べる -->
+    <!-- エピソード。いつも出ている -->
+    <!-- まだ読んでいないエピソードが解放されていると、右上に赤い点が付く（.new） -->
+    <button class="homebtn" id="openEpisode" aria-label="エピソードを見る">
+      <svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3.5 5v13.5C7 18 10 18.5 12 20c2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z"/><path d="M12 6.5V20"/></svg>
+    </button>
+    <!-- ミッション。受け取れる報酬があるときだけ出て、押すとレベルとミッションの画面を開く -->
+    <button class="homebtn missionbtn" id="openMission" hidden aria-label="受け取れる報酬があります。ミッションを見る">
       <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 3h6v3H9z"/><path d="M8.5 13l2.5 2.5 4.5-5"/></svg>
       <span class="bang" aria-hidden="true">!</span>
     </button>
@@ -341,6 +347,31 @@
       <div class="sechead"><div class="sectitle">きょうの予定</div></div>
       <div id="todayEvents"></div>
     </div>
+  </div>
+</div>
+
+<!-- エピソード（ホームのゲージの下のボタンから、右からすべって出てくる）。
+     一覧は app.js の EPISODES から作る。レベルが足りないものは題を伏せて出す -->
+<div class="sheet side" id="sheetE">
+  <div class="sheetin">
+    <div class="sidehead">
+      <button class="xbtn" id="eClose" aria-label="とじる"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="sheettitle">エピソード</div>
+    </div>
+    <div id="epList" style="display:flex;flex-direction:column;gap:9px"></div>
+  </div>
+</div>
+
+<!-- エピソードを読む画面。一覧の上に重ねて出し、閉じると一覧に戻る。
+     上：会話がたまっていく（ここだけ動く）／下：「次へ」か選択肢 -->
+<div class="sheet side" id="sheetEp">
+  <div class="sheetin">
+    <div class="sidehead">
+      <button class="xbtn" id="epClose" aria-label="一覧に戻る"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="sheettitle" id="epTitle"></div>
+    </div>
+    <div class="eplog" id="epLog"></div>
+    <div class="epfoot" id="epFoot"></div>
   </div>
 </div>
 

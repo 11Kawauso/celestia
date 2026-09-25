@@ -164,6 +164,7 @@ function normalize(o) {
   const md0 = asObj(o.mood); o.mood = {};
   Object.keys(md0).forEach(k => { if (asDate(k) && moodOf(md0[k])) o.mood[k] = md0[k]; });
   o.moodAsked = asDate(o.moodAsked);   // 調子の窓を最後に自分から出した日（閉じられても、その日はもう出さない）
+  o.epRead = asArr(o.epRead).filter(x => typeof x === "string");   // 最後まで読んだエピソードの id
 
   // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
   o.wkClaim = asArr(o.wkClaim).map(asDate).filter(Boolean);
@@ -785,6 +786,8 @@ function render() {
   $("#giftBtn").hidden = !giftReady(now);
   // 受け取れる報酬があるときだけ、ゲージの下にミッションボタンを出す（毎分の描き直しで、朝5時になれば出る）
   $("#openMission").hidden = !readyCount(now);
+  // 読めるようになったのにまだ読んでいないエピソードがあれば、ボタンに赤い点
+  $("#openEpisode").classList.toggle("new", EPISODES.some(epNew));
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
@@ -1155,6 +1158,132 @@ $("#dMood").addEventListener("click", e => {
   paintDay();
 });
 
+/* ---------- エピソード ---------- */
+/* セラとの短い日常会話。レベルが lv に届くと読めるようになる。何度でも読み返せる。
+   EXPは付けない。最後まで読んだものだけ st.epRead に残し、「NEW」と赤い点を消す。
+   id は既読の記録に使うので、あとから変えない（題や中身は自由に直してよい）。
+
+   steps は上から順に進む。1つは次のどちらか。
+     { say: "セリフ", face: "表情のメモ" }   セラが話す。face は省いてよい。書くとセリフの下に小さく出る
+     { ask: [ { label: "選択肢", then: [ …steps… ] }, … ] }
+                                             選択肢を出す。選んだものの then を話してから、次の段へ進む
+   段の書き方は Lv1-30 の口調（SPEECH の 0 番）に合わせてある。 */
+const EPISODES = [
+  { id: "breakfast", lv: 10, title: "朝ご飯", steps: [
+    { say: "おい。貴様、朝ご飯は食べたか。" },
+    { ask: [
+      { label: "食べた。", then: [
+        { say: "……そうか。" } ] },
+      { label: "食べてない。", then: [
+        { say: "………なぜ食わない。", face: "困惑。呆れ。" },
+        { say: "朝に食わんと、昼まで持たん。……人間は脆い。" } ] }
+    ] },
+    { say: "……それだけだ。行け。" }
+  ] },
+  { id: "umbrella", lv: 20, title: "傘", steps: [
+    { say: "……貴様。今日は外に出るのか。" },
+    { ask: [
+      { label: "出る。", then: [
+        { say: "午後から降る。……傘を持っていけ。" } ] },
+      { label: "出ない。", then: [
+        { say: "……一日中、家か。", face: "呆れ。" },
+        { say: "たまには日の光を浴びろ。……寿命が縮む。" } ] }
+    ] },
+    { say: "……勘違いするな。心配しているわけではない。" },
+    { say: "見張りの仕事だ。" }
+  ] },
+  { id: "name", lv: 30, title: "名前", steps: [
+    { say: "……貴様。ひとつ聞く。" },
+    { say: "貴様にも、名前はあるのか。" },
+    { ask: [
+      { label: "あるよ。", then: [
+        { say: "……そうか。" },
+        { say: "いや、いい。……まだ呼ぶ気はない。" } ] },
+      { label: "教えない。", then: [
+        { say: "………", face: "少しむっとする。" },
+        { say: "……好きにしろ。" } ] }
+    ] },
+    { say: "もう少し見てから、決める。" }
+  ] }
+];
+const epOf = id => EPISODES.find(x => x.id === id);
+const epOpen = ep => st.chara.level >= ep.lv;
+const epNew = ep => epOpen(ep) && !st.epRead.includes(ep.id);
+/* 話し手の名。本名を明かすのは Lv100 なので、それまでは地上の名乗り */
+const epSpeaker = () => (st.chara.level >= MAX_LV ? "セラ" : CHARA);
+
+function renderEpList() {
+  $("#epList").innerHTML = EPISODES.slice().sort((a, b) => a.lv - b.lv).map(ep => epOpen(ep)
+    ? '<button class="row eprow" data-ep="' + esc(ep.id) + '"><div class="rowbody">' +
+      '<div class="rowtitle">' + esc(ep.title) + "</div>" +
+      '<div class="chips"><span class="chip">Lv' + ep.lv + "</span>" +
+      (epNew(ep) ? '<span class="chip imp">NEW</span>' : "") + "</div></div></button>"
+    : '<div class="row locked"><div class="rowbody"><div class="rowtitle">？？？</div>' +
+      '<div class="chips"><span class="chip">Lv' + ep.lv + "で解放</span></div></div></div>"
+  ).join("") || '<div class="empty">エピソードはまだありません。</div>';
+}
+$("#epList").addEventListener("click", e => {
+  const b = e.target.closest("[data-ep]"); if (b) openEp(b.dataset.ep);
+});
+
+/* 読む画面。epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
+   epWait は下の欄がいま何を待っているか（next＝次へ／ask＝選択肢／end＝おわり）。 */
+let epNow = null, epQueue = [], epWait = "", epAsk = null;
+function openEp(id) {
+  const ep = epOf(id); if (!ep || !epOpen(ep)) return;
+  epNow = ep; epQueue = ep.steps.slice();
+  $("#epTitle").textContent = ep.title;
+  $("#epLog").innerHTML = "";
+  openSheet("#sheetEp");
+  epStep();
+}
+function epAdd(html) {
+  const log = $("#epLog");
+  log.insertAdjacentHTML("beforeend", html);
+  log.scrollTop = log.scrollHeight;
+}
+/* 次の段を1つ話す。話したあと、すぐ後ろが選択肢ならそのまま出す */
+function epStep() {
+  const s = epQueue.shift();
+  if (s && s.say != null) {
+    epAdd('<div class="epline"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
+      '<div class="epsay">' + esc(s.say) + "</div>" +
+      (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div>");
+  } else if (s && s.ask) { epQueue.unshift(s); }
+  const nx = epQueue[0];
+  if (nx && nx.ask) {
+    epQueue.shift(); epAsk = nx.ask; epWait = "ask";
+    $("#epFoot").innerHTML = nx.ask.map((c, i) =>
+      '<button class="btn epchoice" data-c="' + i + '">' + esc(c.label) + "</button>").join("");
+  } else if (nx) {
+    epWait = "next";
+    $("#epFoot").innerHTML = '<button class="btn" id="epNext">次へ</button>';
+  } else {
+    epWait = "end";
+    $("#epFoot").innerHTML = '<button class="btn pri" id="epEnd">おわり</button>';
+  }
+}
+function epEnd() {
+  if (epNow && !st.epRead.includes(epNow.id)) { st.epRead.push(epNow.id); save(); render(); }
+  renderEpList();
+  closeSheet("#sheetEp");
+}
+$("#epFoot").addEventListener("click", e => {
+  const c = e.target.closest("[data-c]");
+  if (c && epWait === "ask") {
+    const pick = epAsk[+c.dataset.c]; if (!pick) return;
+    epAdd('<div class="epme">' + esc(pick.label) + "</div>");
+    epQueue = (pick.then || []).concat(epQueue);
+    epAsk = null; epStep();
+    return;
+  }
+  if (e.target.closest("#epNext") && epWait === "next") epStep();
+  if (e.target.closest("#epEnd") && epWait === "end") epEnd();
+});
+/* 会話のところを押しても次へ進む（選択肢とおわりは、ボタンを押したときだけ） */
+$("#epLog").addEventListener("click", () => { if (epWait === "next") epStep(); });
+$("#epClose").addEventListener("click", () => closeSheet("#sheetEp"));   // 途中で閉じたら既読にしない
+
 /* ---------- sheets ---------- */
 /* 真ん中に出る窓（.sheet の side でないもの）を開いているあいだは、透明な幕で後ろを押せなくする。
    幕に色は付けない。暗くするのは窓のまわりの影だけ（style.css の .sheet を見よ）。
@@ -1181,7 +1310,8 @@ function closeSheets() {                       // 全部たたむ（タブを移
    走っていないので、「開くための一押し」で開いたそばから閉じることがない。
    閉じるときはその一押しをここで止める。うしろのボタンまで押されないように。 */
 document.addEventListener("click", e => {
-  const top = $(".sheet.on:not(.side)") || $(".sheet.on");   // 真ん中の窓のほうが手前
+  // 真ん中の窓のほうが手前。右から出るパネルどうし（エピソードの一覧と読む画面）は、あとに書いたほうが手前
+  const top = $(".sheet.on:not(.side)") || $$(".sheet.on.side").pop();
   if (!top || e.target.closest(".pop,.popveil")) return;
   if (e.target.closest(".sheet") === top) return;            // 中を押したときは閉じない
   e.stopPropagation(); e.preventDefault();
@@ -1190,6 +1320,9 @@ document.addEventListener("click", e => {
 /* 右上の小さいゲージ＝レベルとミッションの入口 */
 $("#openStatus").addEventListener("click", () => openSheet("#sheetS"));
 $("#openMission").addEventListener("click", () => openSheet("#sheetS"));   // 行き先は同じ画面（ミッションはこの中）
+/* エピソードは、ゲージの下のボタンから開く（中身は下の「エピソード」の段） */
+$("#openEpisode").addEventListener("click", () => { renderEpList(); openSheet("#sheetE"); });
+$("#eClose").addEventListener("click", () => closeSheet("#sheetE"));
 $("#sClose").addEventListener("click", () => closeSheet("#sheetS"));
 
 /* mission editor */
