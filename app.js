@@ -1162,7 +1162,9 @@ $("#dMood").addEventListener("click", e => {
 /* セラとの短い日常会話。レベルが lv に届くと読めるようになる。何度でも読み返せる。
    EXPは付けない。最後まで読んだものだけ st.epRead に残し、「NEW」と赤い点を消す。
    id は既読の記録に使うので、あとから変えない（題や中身は自由に直してよい）。
-   bg にその話の絵のパスを書くと、読む画面の背景になる（例：bg: "chara/ep-suki.jpg"）。省くとホームと同じ絵。
+   読む画面の絵は2枚重ね。どちらも省いてよい。
+     bg    うしろの背景（例：bg: "bg/room.jpg"）。省くと無地
+     chara その前に立つセレスティア（例：chara: "chara/ep-suki.png"）。省くとホームと同じ絵
 
    steps は上から順に進む。1つは次のどれか。
      { say: "セリフ", face: "表情のメモ" }   セラが話す。face は省いてよい。書くとセリフの下に小さく出る。
@@ -1181,10 +1183,7 @@ const EPISODES = [
       reply: "{name}だ。",
       then: [
         { say: "……ふん。" },
-        { say: "覚えておいてやる。" } ],
-      none: { label: "名乗らない。", then: [
-        { say: "………", face: "眉をひそめる。" },
-        { say: "……まあいい。貴様で十分だ。" } ] }
+        { say: "覚えておいてやる。" } ]
     } },
     { say: "今日から、貴様を見ている。……精々、朝は起きることだ。" }
   ] },
@@ -1280,12 +1279,17 @@ function openEp(id) {
   const ep = epOf(id); if (!ep || !epOpen(ep)) return;
   epNow = ep; epQueue = ep.steps.slice();
   $("#epTitle").textContent = ep.title;
-  const bg = ep.bg || CHARA_IMG, img = $("#epBg");
-  img.hidden = !bg;
-  if (bg && img.getAttribute("src") !== bg) img.src = bg;
+  epPic("#epScene", ep.bg || "");
+  epPic("#epChara", ep.chara || CHARA_IMG);
   $("#epLog").innerHTML = '<div class="eptail" id="epTail"></div>';
   openSheet("#sheetEp");
   epStep();
+}
+/* 絵を差しかえる。パスが空なら隠す */
+function epPic(sel, src) {
+  const img = $(sel);
+  img.hidden = !src;
+  if (src && img.getAttribute("src") !== src) img.src = src;
 }
 const epScroll = () => { const log = $("#epLog"); log.scrollTop = log.scrollHeight; };
 /* 会話を1つ足す（しっぽの手前に） */
@@ -1295,9 +1299,10 @@ function epTail(html) { $("#epTail").innerHTML = html; epScroll(); }
 function epStep() {
   const s = epQueue.shift();
   if (s && s.say != null) {
-    epAdd('<div class="epline"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
-      '<div class="epsay">' + esc(epText(s.say)) + "</div>" +
-      (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div>");
+    // 名前と表情のメモも吹き出しの中に入れる（絵の上に直に置くと読みにくいため）
+    epAdd('<div class="epline"><div class="epsay"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
+      esc(epText(s.say)) +
+      (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div></div>");
   } else if (s && (s.ask || s.name)) { epQueue.unshift(s); }   // 頭がいきなり選択肢や名乗りのとき
   const nx = epQueue[0];
   if (nx && nx.ask) {

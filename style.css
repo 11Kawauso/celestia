@@ -710,35 +710,41 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   padding-top:13px;border-top:1px solid var(--line)}
 /* エピソード。一覧の行はボタンなので、左寄せに戻す */
 .eprow{width:100%;text-align:left}
-/* 読む画面。うしろ一面に絵、上に見出し、下に会話の面。
-   重なりは 絵（0）→ 見出しを読めるようにする上の影（1）→ 中身（2）。 */
-#sheetEp{overflow:hidden;background:var(--bg)}
-.epbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;z-index:0}
+/* 読む画面。うしろから 背景（0）→ セレスティア（1）→ 見出しを読めるようにする上の影（2）→ 中身（3）。
+   背景が無いあいだは無地（画面の地の色）。
+   いまのセレスティアの絵は背景ごと描いてあるので、画面いっぱいに広げて上寄せで切る。
+   背景を抜いた立ち絵に替えたら、.epchara を object-fit:contain; object-position:center bottom にする。 */
+#sheetEp{overflow:hidden;background:var(--bg);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+.epscene,.epchara{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.epscene{z-index:0;object-position:center}
+.epchara{z-index:1;object-position:center top}
 #sheetEp::before{
-  content:"";position:absolute;left:0;right:0;top:0;z-index:1;pointer-events:none;
+  content:"";position:absolute;left:0;right:0;top:0;z-index:2;pointer-events:none;
   height:calc(env(safe-area-inset-top) + 96px);
   background:linear-gradient(color-mix(in srgb,var(--bg) 78%,transparent),transparent);
 }
-#sheetEp .sheetin{position:relative;z-index:2;height:100%}
+#sheetEp .sheetin{position:relative;z-index:3;height:100%}
 #sheetEp .sheettitle{text-shadow:0 1px 6px color-mix(in srgb,var(--bg) 80%,transparent)}
-/* 会話の面。薄い半透明で、絵が透けて見える。会話が増えるほど上へ伸び、画面の6割を超えたら中が流れる。
-   いちばん上の1つに margin-top:auto を付けて、会話を面の下に寄せる（増えると上へ押し出される） */
+/* 会話の面。ごく薄い半透明で、絵がほとんどそのまま透ける。画面の下端近くに置く。
+   会話が増えるほど上へ伸び、画面の半分を超えたら中が流れる。
+   いちばん上の1つに margin-top:auto を付けて、会話を面の下に寄せる（増えると上へ押し出される）。
+   文字は面の上に直に置かず、必ず吹き出しか下じきの上に置く（絵の上だと読めない） */
 .eplog{
-  margin-top:auto;max-height:60%;overflow-y:auto;
-  display:flex;flex-direction:column;gap:11px;padding:14px 12px;
-  background:color-mix(in srgb,var(--bg) 38%,transparent);
-  border:1px solid color-mix(in srgb,var(--line) 55%,transparent);border-radius:18px;
+  margin-top:auto;max-height:52%;overflow-y:auto;
+  display:flex;flex-direction:column;gap:10px;padding:12px 10px;
+  background:color-mix(in srgb,var(--bg) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--line) 40%,transparent);border-radius:18px;
 }
 .eplog > :first-child{margin-top:auto}
 .epline{align-self:flex-start;max-width:86%;animation:epin .22s ease}
-.epwho{font-size:11px;color:var(--dawn);font-weight:700;letter-spacing:.06em;margin:0 0 3px 4px;
-  text-shadow:0 1px 4px color-mix(in srgb,var(--bg) 90%,transparent)}
-.epsay{background:color-mix(in srgb,var(--bg2) 84%,transparent);border:1px solid var(--line);border-radius:4px 14px 14px 14px;
-  padding:10px 13px;font-size:14.5px;line-height:1.7;overflow-wrap:anywhere}
-.epface{font-size:11.5px;color:var(--ink2);margin:4px 0 0 6px;   /* 表情のメモ。顔の絵が入るまでの代わり */
-  text-shadow:0 1px 4px color-mix(in srgb,var(--bg) 90%,transparent)}
+.epsay{background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1px solid var(--line);border-radius:4px 14px 14px 14px;
+  padding:8px 13px 10px;font-size:15px;line-height:1.7;font-weight:500;color:var(--ink);overflow-wrap:anywhere;
+  box-shadow:0 2px 10px rgba(10,8,20,.18)}
+.epwho{font-size:11px;line-height:1.4;color:var(--dawn);font-weight:700;letter-spacing:.06em;margin-bottom:2px}
+.epface{font-size:12px;line-height:1.5;color:var(--ink3);margin-top:3px}   /* 表情のメモ。顔の絵が入るまでの代わり */
 .epme{align-self:flex-end;max-width:80%;border-radius:14px 4px 14px 14px;padding:9px 13px;overflow-wrap:anywhere;
-  font-size:14px;color:#fff;background:linear-gradient(135deg,var(--dusk),var(--dawn));animation:epin .22s ease}
+  font-size:15px;font-weight:500;color:#fff;background:linear-gradient(135deg,var(--dusk),var(--dawn));
+  box-shadow:0 2px 10px rgba(10,8,20,.18);animation:epin .22s ease}
 @keyframes epin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 /* 会話のいちばん下（しっぽ）。いま待っているものを出す */
 .eptail:empty{display:none}
@@ -746,28 +752,33 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 /* あなたの側の吹き出しの候補。選ぶと、塗りつぶした吹き出し（.epme）になって会話に残る */
 .epopts{display:flex;flex-direction:column;align-items:flex-end;gap:7px;animation:epin .22s ease}
 .epopt{
-  max-width:80%;border-radius:14px 4px 14px 14px;padding:9px 14px;font-size:14px;text-align:left;
-  color:var(--ink);background:color-mix(in srgb,var(--bg2) 84%,transparent);border:1.5px solid var(--dawn);
+  max-width:80%;border-radius:14px 4px 14px 14px;padding:9px 14px;font-size:15px;font-weight:500;text-align:left;
+  color:var(--ink);background:color-mix(in srgb,var(--bg2) 94%,transparent);border:1.5px solid var(--dawn);
+  box-shadow:0 2px 10px rgba(10,8,20,.18);
 }
 .epopt:active{transform:scale(.97)}
 /* 名前を書く吹き出し。欄と「名乗る」をひとつの吹き出しに入れる */
 .epnamebox{
   width:min(80%,280px);display:flex;align-items:center;gap:6px;padding:4px 4px 4px 12px;
-  border-radius:14px 4px 14px 14px;background:color-mix(in srgb,var(--bg2) 90%,transparent);border:1.5px solid var(--dawn);
+  border-radius:14px 4px 14px 14px;background:color-mix(in srgb,var(--bg2) 96%,transparent);border:1.5px solid var(--dawn);
+  box-shadow:0 2px 10px rgba(10,8,20,.18);
 }
 .epnamebox input{flex:1;min-width:0;border:none;background:none;outline:none;font-size:16px;padding:6px 0;color:var(--ink)}   /* 16px 未満だと iPhone が拡大する */
 .epnamebox input::placeholder{color:var(--ink3)}
 .epsend{flex:none;border-radius:10px;padding:7px 12px;font-size:13px;font-weight:700;color:#fff;
   background:linear-gradient(135deg,var(--dusk),var(--dawn))}
-.epnote{max-width:80%;font-size:11px;line-height:1.6;color:var(--ink2);text-align:right;
-  text-shadow:0 1px 4px color-mix(in srgb,var(--bg) 90%,transparent)}
+/* 小さな字は、うすい下じきに載せて読めるようにする */
+.epnote,.ephint{
+  border-radius:99px;padding:3px 10px;font-size:11px;line-height:1.6;color:var(--ink2);
+  background:color-mix(in srgb,var(--bg2) 88%,transparent);
+}
+.epnote{max-width:88%;border-radius:10px;text-align:right}
 /* 「タップで次へ」。どこを押しても進むので、目印だけ */
-.ephint{align-self:center;font-size:11px;letter-spacing:.08em;color:var(--ink2);padding-top:2px;
-  animation:ephint 1.6s ease-in-out infinite;text-shadow:0 1px 4px color-mix(in srgb,var(--bg) 90%,transparent)}
+.ephint{align-self:center;letter-spacing:.08em;animation:ephint 1.6s ease-in-out infinite}
 .ephint::after{content:" ▼";font-size:9px}
-@keyframes ephint{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes ephint{0%,100%{opacity:.55}50%{opacity:1}}
 .epend{align-self:center;border-radius:99px;padding:9px 30px;font-size:13.5px;font-weight:700;color:#fff;
-  background:linear-gradient(135deg,var(--dusk),var(--dawn));animation:epin .22s ease}
+  background:linear-gradient(135deg,var(--dusk),var(--dawn));box-shadow:0 2px 10px rgba(10,8,20,.18);animation:epin .22s ease}
 .field:disabled{opacity:.45}   /* 通知がオフのあいだの通知時間 */
 .pill:disabled,.btn:disabled{opacity:.45;cursor:default}   /* 早起きの時刻を変えられない朝の時間など */
 .locknote{margin-top:8px;color:var(--bad)}
