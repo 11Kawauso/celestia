@@ -711,12 +711,15 @@ function say(scene, now, tail, n) {
   st.said[scene] = keyOf(now);
   save();
 }
+/* いま受け取れる報酬の数（今日のミッション＋今週の早起き）。
+   ホーム右上のミッションボタンと、受け取りのセリフの「あと◯つ」で使う。 */
+const readyCount = now => st.missions
+  .filter(m => m.days.includes(now.getDay()))
+  .filter(m => claimState(m, now, false) === "ready").length +
+  (weekShown(now).state === "ready" ? 1 : 0);   // 日曜の早起きで、週の報酬も受け取れるようになる
 /* 受け取りのセリフに足す「あと◯つ」。残っていなければ空。 */
 function moreTail(now) {
-  const left = st.missions
-    .filter(m => m.days.includes(now.getDay()))
-    .filter(m => claimState(m, now, false) === "ready").length +
-    (weekShown(now).state === "ready" ? 1 : 0);   // 日曜の早起きで、週の報酬も受け取れるようになる
+  const left = readyCount(now);
   if (!left) return "";
   const l = SPEECH[toneOf(st.chara.level)].more;
   if (!l || !l.length) return "";
@@ -780,6 +783,8 @@ function render() {
   }
   $("#speech").textContent = st.say;
   $("#giftBtn").hidden = !giftReady(now);
+  // 受け取れる報酬があるときだけ、ゲージの下にミッションボタンを出す（毎分の描き直しで、朝5時になれば出る）
+  $("#openMission").hidden = !readyCount(now);
   // today's missions
   const todays = st.missions.filter(m => m.days.includes(now.getDay()))
     .sort((a, b) => (a.type === "wake" ? 0 : 1) - (b.type === "wake" ? 0 : 1) ||
@@ -1184,6 +1189,7 @@ document.addEventListener("click", e => {
 }, true);
 /* 右上の小さいゲージ＝レベルとミッションの入口 */
 $("#openStatus").addEventListener("click", () => openSheet("#sheetS"));
+$("#openMission").addEventListener("click", () => openSheet("#sheetS"));   // 行き先は同じ画面（ミッションはこの中）
 $("#sClose").addEventListener("click", () => closeSheet("#sheetS"));
 
 /* mission editor */

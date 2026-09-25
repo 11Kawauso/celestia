@@ -215,6 +215,11 @@
         </svg>
         <span class="minilv" id="minilv">1</span>
       </button>
+    <!-- ゲージの下。受け取れる報酬があるときだけ出て、押すとレベルとミッションの画面を開く -->
+    <button class="missionbtn" id="openMission" hidden aria-label="受け取れる報酬があります。ミッションを見る">
+      <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 3h6v3H9z"/><path d="M8.5 13l2.5 2.5 4.5-5"/></svg>
+      <span class="bang" aria-hidden="true">!</span>
+    </button>
     <!-- 右端のプレゼントは、誕生日にだけ出る（受け取ったら消える） -->
     <div class="speech">
       <div class="speechtext" id="speech"></div>

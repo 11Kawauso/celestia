@@ -210,6 +210,24 @@ main:not(.on-home) .homeonly{display:none}
 }
 .fullbtn:active{transform:scale(.93)}
 .fullbtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+/* ゲージの下のミッションボタン。受け取れる報酬があるときだけ出る（app.js の render）。
+   36px の丸をゲージ（48px）の真下にそろえるため、右の余白はゲージより6px多い。
+   右上の赤い「!」で、受け取り待ちがあることを知らせる。 */
+.missionbtn{
+  align-self:flex-end;margin:12px 16px 0 0;position:relative;
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;
+  color:var(--dawn);border:1px solid var(--dawn);
+  background:color-mix(in srgb,var(--bg2) 80%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  filter:drop-shadow(0 2px 6px rgba(10,8,20,.35));
+}
+.missionbtn:active{transform:scale(.93)}
+.missionbtn svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.missionbtn .bang{
+  position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
+  display:grid;place-items:center;background:#e0453f;color:#fff;
+  font-size:11px;font-weight:800;line-height:1;border:1.5px solid var(--bg);
+}
 .minihalo .ring{position:absolute;inset:0;width:48px;height:48px}
 .miniface{fill:color-mix(in srgb,var(--bg2) 88%,transparent)}   /* 数字を読めるようにする下じき */
 .minilv{
