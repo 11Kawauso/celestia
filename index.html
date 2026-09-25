@@ -47,7 +47,7 @@
         <button class="navb calnext" id="nextM" aria-label="次の月"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
       <div class="helprow"><button class="helpbtn" data-act="help" data-help="n-cal" aria-controls="n-cal" aria-expanded="false" aria-label="説明を見る">?</button></div>
-      <div class="helptext" id="n-cal"><div class="note">日曜と祝日の日付は赤、土曜は青。枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。日付をタップすると中身が見られます。</div></div>
+      <div class="helptext" id="n-cal"><div class="note">日曜と祝日の日付は赤、土曜は青。枠の下のバーは、その日のミッション達成ぐあい。青い点は予定、金色の点は長期目標の期限。顔はその日の調子。日付をタップすると中身が見られます（調子の選び直しもここで）。</div></div>
     </section>
 
     <!-- GOALS -->
@@ -348,6 +348,11 @@
     </div>
     <!-- 上：追加ずみのもの。ここだけスクロールする -->
     <div class="dayscroll">
+      <!-- その日の調子。同じものをもう一度押すと消える。先の日には出さない -->
+      <div id="dMoodWrap">
+        <div class="lab" style="margin-bottom:6px">調子</div>
+        <div class="moods sm" id="dMood"></div>
+      </div>
       <div>
         <div class="lab" style="margin-bottom:6px">予定</div>
         <div id="dEvents" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -396,6 +401,16 @@
       <button class="btn" id="cNo">やめる</button>
       <button class="btn danger" id="cYes">消す</button>
     </div>
+  </div>
+</div>
+
+<!-- 今日の調子。その日はじめて開いたときに出る。中のボタンは app.js の MOOD から作る -->
+<div class="sheet" id="sheetMood">
+  <div class="sheetin">
+    <div class="sheettitle">今日の調子は？</div>
+    <div class="moods" id="moodPick"></div>
+    <div class="note">選んだ調子はカレンダーに残ります。あとから日付を押して選び直せます。</div>
+    <button class="btn" id="moodLater">あとで</button>
   </div>
 </div>
 

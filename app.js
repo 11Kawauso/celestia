@@ -31,7 +31,7 @@ function seed() {
       wakeMission(uid(), WAKE_DEFAULT)
     ],
     goals: [], memo: [], reminders: [],
-    events: {}, log: {}, theme: "auto", notify: false
+    events: {}, log: {}, mood: {}, theme: "auto", notify: false
   };
 }
 /* 保存データを今の形にそろえる。古い版から来たものも、手で書きかえられたものも
@@ -56,6 +56,21 @@ function wakeMission(id, time) {
   return { id: id, type: "wake", title: wakeTitle(w.time), exp: w.exp,
            days: [0,1,2,3,4,5,6], mode: "before", time: w.time };
 }
+
+/* その日の調子。その日はじめて開いたときに選んで、カレンダーに残す。
+   自分で選ぶだけのものなので、EXPは付けない（押すだけでレベルが上がってしまうため）。
+   img にセレスティアの顔の絵のパスを入れると、絵文字の代わりにそれが出る（例："chara/mood-best.png"）。
+   k は保存に使う名前なので、あとから変えない。並びは画面の並び。 */
+const MOOD = [
+  { k: "best",   label: "最高", emoji: "😆", img: "" },
+  { k: "good",   label: "良い", emoji: "🙂", img: "" },
+  { k: "normal", label: "普通", emoji: "😐", img: "" },
+  { k: "bad",    label: "悪い", emoji: "😞", img: "" },
+  { k: "worst",  label: "最悪", emoji: "😫", img: "" },
+  { k: "sick",   label: "病気", emoji: "🤒", img: "" }
+];
+const moodOf = k => MOOD.find(x => x.k === k) || null;
+const MOOD_FROM = 5;   // 窓を自分から出すのは朝5時から（夜ふかしで0時をまたいだときに、翌日の調子を聞かないように）
 
 const asStr = v => (typeof v === "string" ? v : "");
 const asNum = (v, d) => (typeof v === "number" && isFinite(v) ? v : d);
@@ -144,6 +159,11 @@ function normalize(o) {
     const list = asArr(lg[k]).filter(x => typeof x === "string");
     if (list.length) o.log[k] = list;
   });
+
+  // その日の調子。日付 → MOOD の k。知らない値は捨てる
+  const md0 = asObj(o.mood); o.mood = {};
+  Object.keys(md0).forEach(k => { if (asDate(k) && moodOf(md0[k])) o.mood[k] = md0[k]; });
+  o.moodAsked = asDate(o.moodAsked);   // 調子の窓を最後に自分から出した日（閉じられても、その日はもう出さない）
 
   // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
   o.wkClaim = asArr(o.wkClaim).map(asDate).filter(Boolean);
@@ -480,6 +500,7 @@ const OPEN_SCENES = [
        night        4 夜（21時〜0時）
        midnight     5 夜中（1時〜5時）
        holiday      7 土日・祝日
+       mood_best 〜 mood_sick  今日の調子を選んだ（キーの後ろは MOOD の k）
        more         受け取りのセリフの後ろに足す（残りがあるときだけ）
        trueName     Lv100 に着いて、本名を明かす（段階3にだけある。ほかの段階では着かないため） */
 const SPEECH = [
@@ -514,6 +535,12 @@ const SPEECH = [
                    "こんな時間に何をしている。寝ろ。"],
     holiday:      ["休みか。……だらけるなよ。",
                    "休みだろうと、朝は来る。分かっているな、{you}。"],
+    mood_best:    ["……そうか。浮かれて足をすくわれるなよ。"],
+    mood_good:    ["悪くないか。……ならば、励め。"],
+    mood_normal:  ["普通か。……それでいい。"],
+    mood_bad:     ["……そういう日もある。倒れるなよ、{you}。"],
+    mood_worst:   ["最悪か。……今日を越えれば、それでいい。"],
+    mood_sick:    ["……病か。寿命を縮めるな。今日は寝ていろ。"],
     more:         ["……あと{n}つ残っている。"] },
 
   { /* 1 大天使（Lv31-60）：名前で呼ぶ・そっけないが、認めている */
@@ -544,6 +571,12 @@ const SPEECH = [
                    "夜更かしはやめろ。……いいから、寝ろ。"],
     holiday:      ["今日は休みか。……たまには、ゆっくりしろ。",
                    "休みでも朝は来るぞ、{you}。"],
+    mood_best:    ["{you}、調子がいいのか。……何よりだ。"],
+    mood_good:    ["良い朝か、{you}。……その調子でいけ。"],
+    mood_normal:  ["普通か。……普通の日を重ねるのが、いちばん強い。"],
+    mood_bad:     ["……調子が悪いか。今日は、できることだけやれ。"],
+    mood_worst:   ["そうか、{you}。……今日は、自分を責めるな。"],
+    mood_sick:    ["病気か、{you}。……休め。治すことだけ考えろ。"],
     more:         ["あと{n}つある。"] },
 
   { /* 2 力天使（Lv61-90）：ご主人・硬い口調のまま、仕える側として尽くす */
@@ -574,6 +607,12 @@ const SPEECH = [
                    "こんな時間まで……。心配になる。"],
     holiday:      ["今日は休みだな。{you}は、何をして過ごす？",
                    "休みの日にも来てくれたのか。……うれしい。"],
+    mood_best:    ["{you}の調子がいいと、……私もうれしい。"],
+    mood_good:    ["良かった、{you}。……今日もそばにいる。"],
+    mood_normal:  ["普通の日か。……それも、大事な一日だ。"],
+    mood_bad:     ["{you}、つらいのか。……無理はしないでくれ。"],
+    mood_worst:   ["……そうか。今日は何もできなくても、責めはしない。"],
+    mood_sick:    ["{you}、休んでくれ。……死神は、私が近づけさせん。"],
     more:         ["あと{n}つ受け取れる。"] },
 
   { /* 3 熾天使（Lv91-100）：ご主人様・丁寧だが、短く静か */
@@ -605,6 +644,12 @@ const SPEECH = [
                    "こんな時間まで……。お体に障ります。"],
     holiday:      ["{you}、今日はお休みですね。……ごゆるりと。",
                    "お休みの日にもお会いできて、うれしく思います。"],
+    mood_best:    ["{you}、何よりです。……そのお顔が見られて、うれしく思います。"],
+    mood_good:    ["それは良かった。……今日も、おそばに。"],
+    mood_normal:  ["穏やかな一日になりますように、{you}。"],
+    mood_bad:     ["{you}、ご無理なさらず。……私がついております。"],
+    mood_worst:   ["……おつらいのですね。今日は、ただ息をしていてくだされば十分です。"],
+    mood_sick:    ["{you}、どうかお休みください。……死神は、一歩も近づけさせません。"],
     more:         ["あと{n}つ、お受け取りいただけます。"] }
 ];
 
@@ -913,9 +958,11 @@ function calPageHtml(calY, calM) {
     // 日曜と祝日は赤、土曜は青。今日はこの上から金色になる。
     const dw = d.getDay();
     const dc = (dw === 0 || holidayName(d)) ? " sun" : dw === 6 ? " sat" : "";
+    const mo = moodOf(st.mood[k]);
     html += '<button class="cell' + (k === tk ? " now" : "") + '" data-act="day" data-k="' + k + '">' +
       '<span class="d' + dc + '">' + day + "</span>" +
       (dots ? '<span class="dots">' + dots + "</span>" : "") +
+      (mo ? moodFace(mo, "cmood") : "") +
       (doneN ? '<span class="mini"><i style="width:' + Math.round(ratio * 100) + '%"></i></span>' : "") +
       "</button>";
   }
@@ -1065,6 +1112,44 @@ $("#mmDelete").addEventListener("click", () => {
   });
 });
 
+/* ---------- 今日の調子 ---------- */
+/* その日はじめて開いたとき（朝5時から）に、真ん中の窓で聞く。閉じられたら、その日はもう聞かない。
+   選びそこねた日や選び直したい日は、カレンダーの日の画面からいつでも選べる（先の日は選べない）。 */
+const moodFace = (mo, cls) => mo.img
+  ? '<img class="mface ' + cls + '" src="' + esc(mo.img) + '" alt="">'
+  : '<span class="mface ' + cls + '" aria-hidden="true">' + mo.emoji + "</span>";
+const moodButtons = cur => MOOD.map(mo =>
+  '<button class="moodbtn' + (mo.k === cur ? " on" : "") + '" data-mood="' + mo.k + '" aria-pressed="' + (mo.k === cur) + '">' +
+  moodFace(mo, "") + "<span>" + mo.label + "</span></button>").join("");
+
+function maybeAskMood(now) {
+  const k = keyOf(now);
+  if (keepOld || st.mood[k] || st.moodAsked === k || now.getHours() < MOOD_FROM) return;
+  if ($(".sheet.on")) return;            // 何か開いて触っている途中なら割りこまない（次の機会に聞く）
+  st.moodAsked = k; save();
+  $("#moodPick").innerHTML = moodButtons("");
+  openSheet("#sheetMood");
+}
+/* 調子を決める（null なら消す）。今日の分を決めたときだけ、セレスティアがひとこと返す。
+   ただし、はじめて開いた日は最初のあいさつを残したいので、返さない。 */
+function setMood(k, v) {
+  const now = new Date();
+  if (v) st.mood[k] = v; else delete st.mood[k];
+  if (v && k === keyOf(now) && st.said.first !== k) say("mood_" + v, now);
+  save(); render();
+}
+$("#moodPick").addEventListener("click", e => {
+  const b = e.target.closest("[data-mood]"); if (!b) return;
+  setMood(keyOf(new Date()), b.dataset.mood);
+  closeSheet("#sheetMood");
+});
+$("#moodLater").addEventListener("click", () => closeSheet("#sheetMood"));
+$("#dMood").addEventListener("click", e => {
+  const b = e.target.closest("[data-mood]"); if (!b) return;
+  setMood(dayKey, st.mood[dayKey] === b.dataset.mood ? null : b.dataset.mood);   // 同じものをもう一度押すと消える
+  paintDay();
+});
+
 /* ---------- sheets ---------- */
 /* 真ん中に出る窓（.sheet の side でないもの）を開いているあいだは、透明な幕で後ろを押せなくする。
    幕に色は付けない。暗くするのは窓のまわりの影だけ（style.css の .sheet を見よ）。
@@ -1206,6 +1291,10 @@ function paintDay() {
   const ok = canNotify();
   $("#dNotifyDate").disabled = $("#dNotifyTime").disabled = !ok;
   $("#dNotifyOff").hidden = ok;
+
+  // 調子は今日までの日だけ。先の日はまだ分からないので出さない
+  $("#dMoodWrap").hidden = k > keyOf(new Date());
+  $("#dMood").innerHTML = moodButtons(st.mood[k] || "");
 
   const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   $("#dEvents").innerHTML = ev.length ? ev.map(e =>
@@ -1457,11 +1546,12 @@ let holdTimer = null, holdFrom = null, holding = false, holdKey = "", holdEndAt 
 function dayPopHtml(k) {
   const [y, m, dd] = k.split("-").map(Number);
   const d = new Date(y, m - 1, dd);
-  const holi = holidayName(d);
+  const holi = holidayName(d), mo = moodOf(st.mood[k]);
   const ev = (st.events[k] || []).slice().sort((a, b) => evKey(a).localeCompare(evKey(b)));
   return '<div class="daypop">' +
     '<div class="dpdate">' + y + "年" + m + "月" + dd + "日（" + DOW[d.getDay()] + "）</div>" +
     (holi ? '<div class="dpholi">' + esc(holi) + "</div>" : "") +
+    (mo ? '<div class="dpmood">' + moodFace(mo, "dpface") + "調子：" + mo.label + "</div>" : "") +
     (ev.length
       ? '<ul class="dplist">' + ev.map(e => '<li' + (e.important ? ' class="imp"' : "") + ">" +
           (evSpan(e) ? '<span class="dptime">' + esc(evSpan(e)) + "</span>" : "") +
@@ -2170,16 +2260,19 @@ paintNotify();
 syncNow();
 updateSpeech(new Date());
 render();
+maybeAskMood(new Date());
 let lastDay = keyOf(new Date());
 setInterval(() => {
   const k = keyOf(new Date());
   if (k !== lastDay) { lastDay = k; buildCal(); }   // 日付が変わったら、今月をまん中に並べ直す
   updateSpeech(new Date());
   render();
+  maybeAskMood(new Date());   // 開いたまま朝5時をまたいだとき
 }, 60000);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
   updateSpeech(new Date()); render();
+  maybeAskMood(new Date());
   syncNow();   // 戻ってきたら、端末の中身とサーバーを合わせ直す（離れる前の送り損ねもここで拾う）
 });
 
