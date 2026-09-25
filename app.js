@@ -1163,12 +1163,30 @@ $("#dMood").addEventListener("click", e => {
    EXPは付けない。最後まで読んだものだけ st.epRead に残し、「NEW」と赤い点を消す。
    id は既読の記録に使うので、あとから変えない（題や中身は自由に直してよい）。
 
-   steps は上から順に進む。1つは次のどちらか。
-     { say: "セリフ", face: "表情のメモ" }   セラが話す。face は省いてよい。書くとセリフの下に小さく出る
+   steps は上から順に進む。1つは次のどれか。
+     { say: "セリフ", face: "表情のメモ" }   セラが話す。face は省いてよい。書くとセリフの下に小さく出る。
+                                             {name} はユーザーの名前（決めていなければ「貴様」）
      { ask: [ { label: "選択肢", then: [ …steps… ] }, … ] }
                                              選択肢を出す。選んだものの then を話してから、次の段へ進む
+     { name: { reply: "{name}だ。", then: [ …steps… ], none: { label: "名乗らない。", then: [ …steps… ] } } }
+                                             ユーザーが名乗る。名前を決めてあれば reply のボタンが1つだけ出る。
+                                             決めていなければ入力欄が出て、ここで決めた名前が設定の「あなたの名前」になる。
+                                             none を書くと、決めていない人に「名乗らない」も出す（省いてよい）
    段の書き方は Lv1-30 の口調（SPEECH の 0 番）に合わせてある。 */
 const EPISODES = [
+  { id: "hello", lv: 1, title: "出会い", steps: [
+    { say: "私はセレスティアだ。貴様の名は。" },
+    { name: {
+      reply: "{name}だ。",
+      then: [
+        { say: "……ふん。" },
+        { say: "覚えておいてやる。" } ],
+      none: { label: "名乗らない。", then: [
+        { say: "………", face: "眉をひそめる。" },
+        { say: "……まあいい。貴様で十分だ。" } ] }
+    } },
+    { say: "今日から、貴様を見ている。……精々、朝は起きることだ。" }
+  ] },
   { id: "breakfast", lv: 10, title: "朝ご飯", steps: [
     { say: "おい。貴様、朝ご飯は食べたか。" },
     { ask: [
@@ -1192,18 +1210,19 @@ const EPISODES = [
     { say: "……勘違いするな。心配しているわけではない。" },
     { say: "見張りの仕事だ。" }
   ] },
+  /* Lv31 から名前で呼ぶようになる（呼び方は notify-lines.js の you）。その手前の話 */
   { id: "name", lv: 30, title: "名前", steps: [
-    { say: "……貴様。ひとつ聞く。" },
-    { say: "貴様にも、名前はあるのか。" },
+    { say: "……貴様。" },
+    { say: "貴様を名で呼ぶかどうか、……考えていた。" },
     { ask: [
-      { label: "あるよ。", then: [
-        { say: "……そうか。" },
-        { say: "いや、いい。……まだ呼ぶ気はない。" } ] },
-      { label: "教えない。", then: [
+      { label: "呼んでいいよ。", then: [
+        { say: "……急かすな。", face: "目をそらす。" },
+        { say: "決めるのは私だ。" } ] },
+      { label: "貴様のままでいい。", then: [
         { say: "………", face: "少しむっとする。" },
-        { say: "……好きにしろ。" } ] }
+        { say: "……そうか。好きにしろ。" } ] }
     ] },
-    { say: "もう少し見てから、決める。" }
+    { say: "……もう少しだけ、見てから決める。" }
   ] }
 ];
 const epOf = id => EPISODES.find(x => x.id === id);
@@ -1227,8 +1246,9 @@ $("#epList").addEventListener("click", e => {
 });
 
 /* 読む画面。epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
-   epWait は下の欄がいま何を待っているか（next＝次へ／ask＝選択肢／end＝おわり）。 */
-let epNow = null, epQueue = [], epWait = "", epAsk = null;
+   epWait は下の欄がいま何を待っているか（next＝次へ／ask＝選択肢／name＝名乗る／end＝おわり）。 */
+let epNow = null, epQueue = [], epWait = "", epAsk = null, epName = null;
+const epText = t => t.replace(/\{name\}/g, st.user || "貴様");
 function openEp(id) {
   const ep = epOf(id); if (!ep || !epOpen(ep)) return;
   epNow = ep; epQueue = ep.steps.slice();
@@ -1247,14 +1267,24 @@ function epStep() {
   const s = epQueue.shift();
   if (s && s.say != null) {
     epAdd('<div class="epline"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
-      '<div class="epsay">' + esc(s.say) + "</div>" +
+      '<div class="epsay">' + esc(epText(s.say)) + "</div>" +
       (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div>");
-  } else if (s && s.ask) { epQueue.unshift(s); }
+  } else if (s && (s.ask || s.name)) { epQueue.unshift(s); }   // 頭がいきなり選択肢や名乗りのとき
   const nx = epQueue[0];
   if (nx && nx.ask) {
     epQueue.shift(); epAsk = nx.ask; epWait = "ask";
     $("#epFoot").innerHTML = nx.ask.map((c, i) =>
       '<button class="btn epchoice" data-c="' + i + '">' + esc(c.label) + "</button>").join("");
+  } else if (nx && nx.name) {
+    epQueue.shift(); epName = nx.name; epWait = "name";
+    // 名前を決めてあれば、名乗るボタンが1つだけ。決めていなければ、ここで決める
+    $("#epFoot").innerHTML = st.user
+      ? '<button class="btn epchoice" data-nm="say">' + esc(epText(epName.reply || "{name}だ。")) + "</button>"
+      : '<input class="field" id="epNameIn" placeholder="あなたの名前" maxlength="20" enterkeyhint="done" autocomplete="off">' +
+        '<div class="btnrow">' +
+        (epName.none ? '<button class="btn" data-nm="none">' + esc(epName.none.label || "名乗らない。") + "</button>" : "") +
+        '<button class="btn pri" data-nm="set">名乗る</button></div>' +
+        '<div class="note">ここで決めた名前は、設定の「あなたの名前」になります。あとから変えられます。</div>';
   } else if (nx) {
     epWait = "next";
     $("#epFoot").innerHTML = '<button class="btn" id="epNext">次へ</button>';
@@ -1277,8 +1307,32 @@ $("#epFoot").addEventListener("click", e => {
     epAsk = null; epStep();
     return;
   }
+  const nm = e.target.closest("[data-nm]");
+  if (nm && epWait === "name") { epNamed(nm.dataset.nm); return; }
   if (e.target.closest("#epNext") && epWait === "next") epStep();
   if (e.target.closest("#epEnd") && epWait === "end") epEnd();
+});
+/* 名乗った（say＝決めてある名前で／set＝入力欄の名前を決めて／none＝名乗らない） */
+function epNamed(how) {
+  const n = epName; if (!n) return;
+  let then = n.then || [];
+  if (how === "set") {
+    const v = $("#epNameIn").value.trim().slice(0, 20);
+    if (!v) { $("#epNameIn").focus(); return; }
+    st.user = v; save(); render();   // 設定の「あなたの名前」にも入る
+    $("#epNameIn").blur();
+  }
+  if (how === "none") {
+    epAdd('<div class="epme">' + esc(n.none.label || "名乗らない。") + "</div>");
+    then = n.none.then || [];
+  } else {
+    epAdd('<div class="epme">' + esc(epText(n.reply || "{name}だ。")) + "</div>");
+  }
+  epQueue = then.concat(epQueue);
+  epName = null; epStep();
+}
+$("#epFoot").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "epNameIn" && !e.isComposing) { e.preventDefault(); epNamed("set"); }
 });
 /* 会話のところを押しても次へ進む（選択肢とおわりは、ボタンを押したときだけ） */
 $("#epLog").addEventListener("click", () => { if (epWait === "next") epStep(); });
