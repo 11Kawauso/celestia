@@ -746,6 +746,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   font-size:15px;font-weight:500;color:#fff;background:linear-gradient(135deg,var(--dusk),var(--dawn));
   box-shadow:0 2px 10px rgba(10,8,20,.18);animation:epin .22s ease}
 @keyframes epin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.epline.old,.epme.old{animation:none}   /* 開き直したときに戻した会話は、動かさずにそのまま出す */
 /* 会話のいちばん下（しっぽ）。いま待っているものを出す */
 .eptail:empty{display:none}
 .eptail{display:flex;flex-direction:column}

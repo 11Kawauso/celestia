@@ -165,6 +165,12 @@ function normalize(o) {
   Object.keys(md0).forEach(k => { if (asDate(k) && moodOf(md0[k])) o.mood[k] = md0[k]; });
   o.moodAsked = asDate(o.moodAsked);   // 調子の窓を最後に自分から出した日（閉じられても、その日はもう出さない）
   o.epRead = asArr(o.epRead).filter(x => typeof x === "string");   // 最後まで読んだエピソードの id
+  // エピソードの進みぐあい。id → したことの並び（"n"・"c0"・"m"・"x"。app.js の epDo を見よ）
+  const ep0 = asObj(o.epProg); o.epProg = {};
+  Object.keys(ep0).forEach(k => {
+    const a = asArr(ep0[k]).filter(x => typeof x === "string" && /^(n|c\d{1,2}|m|x)$/.test(x)).slice(0, 500);
+    if (a.length) o.epProg[k] = a;
+  });
 
   // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
   o.wkClaim = asArr(o.wkClaim).map(asDate).filter(Boolean);
@@ -1159,7 +1165,8 @@ $("#dMood").addEventListener("click", e => {
 });
 
 /* ---------- エピソード ---------- */
-/* セラとの短い日常会話。レベルが lv に届くと読めるようになる。何度でも読み返せる。
+/* セラとの短い日常会話。レベルが lv に届くと読めるようになる。
+   選んだ答えはそのまま残り、開き直すと前に進んだところから続く（最後まで読んだ話は、その会話のまま見返せる）。
    EXPは付けない。最後まで読んだものだけ st.epRead に残し、「NEW」と赤い点を消す。
    id は既読の記録に使うので、あとから変えない（題や中身は自由に直してよい）。
    読む画面の絵は2枚重ね。どちらも省いてよい。
@@ -1272,18 +1279,61 @@ $("#epList").addEventListener("click", e => {
    epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
    会話のいちばん下には「しっぽ」（#epTail）があり、いま待っているものをそこに出す。
    epWait はそれが何か（next＝タップで次へ／ask＝選択肢／name＝名乗る／end＝おわり）。
-   選択肢も名前の入力も、あなたの側（右）の吹き出しとして出す。 */
-let epNow = null, epQueue = [], epWait = "", epAsk = null, epName = null;
+   選択肢も名前の入力も、あなたの側（右）の吹き出しとして出す。
+
+   進みぐあいは話ごとに st.epProg[id] に残し、開き直したらそこまで戻す（読み直しはできない）。
+   残すのはセリフではなく「何をしたか」の並び。
+     "n" 次へ ／ "c0" "c1"… その番号の選択肢 ／ "m" 名乗った ／ "x" 名乗らなかった
+   開いたら頭から並びどおりに進め直す（epReplay のあいだは記録も動きもしない）。
+   あとから中身を書きかえて並びが合わなくなったら、合わなくなったところから先を捨てる。 */
+let epNow = null, epQueue = [], epWait = "", epAsk = null, epName = null, epReplay = false;
 const epText = t => t.replace(/\{name\}/g, st.user || "貴様");
 function openEp(id) {
   const ep = epOf(id); if (!ep || !epOpen(ep)) return;
-  epNow = ep; epQueue = ep.steps.slice();
+  epNow = ep; epQueue = ep.steps.slice(); epAsk = null; epName = null;
   $("#epTitle").textContent = ep.title;
   epPic("#epScene", ep.bg || "");
   epPic("#epChara", ep.chara || CHARA_IMG);
   $("#epLog").innerHTML = '<div class="eptail" id="epTail"></div>';
-  openSheet("#sheetEp");
+  epReplay = true;
   epStep();
+  const acts = st.epProg[ep.id] || [];
+  let n = 0;
+  while (n < acts.length && epDo(acts[n])) n++;
+  if (n < acts.length) { st.epProg[ep.id] = acts.slice(0, n); save(); }
+  epReplay = false;
+  openSheet("#sheetEp");
+  epScroll();
+}
+/* 1つ進める。いまの待ちに合わない操作なら何もせず false */
+function epDo(a) {
+  if (a === "n") {
+    if (epWait !== "next") return false;
+    epRec(a); epStep(); return true;
+  }
+  if (/^c\d+$/.test(a)) {
+    const pick = epWait === "ask" && epAsk[+a.slice(1)];
+    if (!pick) return false;
+    epRec(a);
+    epAdd('<div class="epme">' + esc(pick.label) + "</div>");
+    epQueue = (pick.then || []).concat(epQueue);
+    epAsk = null; epStep(); return true;
+  }
+  if (a === "m" || a === "x") {
+    const nm = epWait === "name" && epName;
+    if (!nm || (a === "x" && !nm.none)) return false;
+    epRec(a);
+    epAdd('<div class="epme">' + esc(a === "x" ? nm.none.label || "名乗らない。" : epText(nm.reply || "{name}だ。")) + "</div>");
+    epQueue = ((a === "x" ? nm.none.then : nm.then) || []).concat(epQueue);
+    epName = null; epStep(); return true;
+  }
+  return false;
+}
+/* したことを残す。進め直しのあいだは残さない */
+function epRec(a) {
+  if (epReplay || !epNow) return;
+  (st.epProg[epNow.id] || (st.epProg[epNow.id] = [])).push(a);
+  save();
 }
 /* 絵を差しかえる。パスが空なら隠す */
 function epPic(sel, src) {
@@ -1292,8 +1342,13 @@ function epPic(sel, src) {
   if (src && img.getAttribute("src") !== src) img.src = src;
 }
 const epScroll = () => { const log = $("#epLog"); log.scrollTop = log.scrollHeight; };
-/* 会話を1つ足す（しっぽの手前に） */
-function epAdd(html) { $("#epTail").insertAdjacentHTML("beforebegin", html); epScroll(); }
+/* 会話を1つ足す（しっぽの手前に）。進め直しで出すものは、ふわっと出る動きを付けない */
+function epAdd(html) {
+  const t = $("#epTail");
+  t.insertAdjacentHTML("beforebegin", html);
+  if (epReplay) t.previousElementSibling.classList.add("old");
+  epScroll();
+}
 function epTail(html) { $("#epTail").innerHTML = html; epScroll(); }
 /* 次の段を1つ話す。話したあと、すぐ後ろが選択肢や名乗りならそのまま出す */
 function epStep() {
@@ -1323,55 +1378,39 @@ function epStep() {
     epWait = "next";
     epTail('<div class="ephint">タップで次へ</div>');
   } else {
+    // 最後まで来たら既読（「おわり」を押さずに閉じても）
     epWait = "end";
     epTail('<button class="epend" id="epEnd">おわり</button>');
+    if (epNow && !st.epRead.includes(epNow.id)) { st.epRead.push(epNow.id); save(); render(); }
   }
 }
-function epEnd() {
-  if (epNow && !st.epRead.includes(epNow.id)) { st.epRead.push(epNow.id); save(); render(); }
-  renderEpList();
-  closeSheet("#sheetEp");
-}
+function epClose() { renderEpList(); closeSheet("#sheetEp"); }
 /* 押したところで受け持ちを分ける。選択肢・名乗り・おわりはそのボタンで、
    それ以外（絵でも会話でも）を押したら次へ進む。上の×は別に受ける */
 $("#sheetEp").addEventListener("click", e => {
   if (e.target.closest(".sidehead")) return;
   const c = e.target.closest("[data-c]");
-  if (c && epWait === "ask") {
-    const pick = epAsk[+c.dataset.c]; if (!pick) return;
-    epAdd('<div class="epme">' + esc(pick.label) + "</div>");
-    epQueue = (pick.then || []).concat(epQueue);
-    epAsk = null; epStep();
-    return;
-  }
+  if (c) { epDo("c" + c.dataset.c); return; }
   const nm = e.target.closest("[data-nm]");
-  if (nm && epWait === "name") { epNamed(nm.dataset.nm); return; }
-  if (e.target.closest("#epEnd") && epWait === "end") { epEnd(); return; }
-  if (epWait === "next") epStep();
+  if (nm) { epNamed(nm.dataset.nm); return; }
+  if (e.target.closest("#epEnd") && epWait === "end") { epClose(); return; }
+  epDo("n");
 });
 /* 名乗った（say＝決めてある名前で／set＝入力欄の名前を決めて／none＝名乗らない） */
 function epNamed(how) {
-  const n = epName; if (!n) return;
-  let then = n.then || [];
+  if (epWait !== "name") return;
   if (how === "set") {
     const v = $("#epNameIn").value.trim().slice(0, 20);
     if (!v) { $("#epNameIn").focus(); return; }
     st.user = v; save(); render();   // 設定の「あなたの名前」にも入る
     $("#epNameIn").blur();
   }
-  if (how === "none") {
-    epAdd('<div class="epme">' + esc(n.none.label || "名乗らない。") + "</div>");
-    then = n.none.then || [];
-  } else {
-    epAdd('<div class="epme">' + esc(epText(n.reply || "{name}だ。")) + "</div>");
-  }
-  epQueue = then.concat(epQueue);
-  epName = null; epStep();
+  epDo(how === "none" ? "x" : "m");
 }
 $("#epLog").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "epNameIn" && !e.isComposing) { e.preventDefault(); epNamed("set"); }
 });
-$("#epClose").addEventListener("click", () => closeSheet("#sheetEp"));   // 途中で閉じたら既読にしない
+$("#epClose").addEventListener("click", epClose);   // 途中で閉じても、そこまでは残る
 
 /* ---------- sheets ---------- */
 /* 真ん中に出る窓（.sheet の side でないもの）を開いているあいだは、透明な幕で後ろを押せなくする。
