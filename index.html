@@ -363,15 +363,16 @@
 </div>
 
 <!-- エピソードを読む画面。一覧の上に重ねて出し、閉じると一覧に戻る。
-     上：会話がたまっていく（ここだけ動く）／下：「次へ」か選択肢 -->
+     うしろ一面にその話の絵（#epBg）。会話は下の半透明の面（#epLog）に下から積んでいき、
+     選択肢や名前の欄も、その流れの中に吹き出しで出す。どこを押しても次へ進む -->
 <div class="sheet side" id="sheetEp">
+  <img class="epbg" id="epBg" alt="">
   <div class="sheetin">
     <div class="sidehead">
       <button class="xbtn" id="epClose" aria-label="一覧に戻る"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="sheettitle" id="epTitle"></div>
     </div>
     <div class="eplog" id="epLog"></div>
-    <div class="epfoot" id="epFoot"></div>
   </div>
 </div>
 

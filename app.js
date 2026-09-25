@@ -1162,6 +1162,7 @@ $("#dMood").addEventListener("click", e => {
 /* セラとの短い日常会話。レベルが lv に届くと読めるようになる。何度でも読み返せる。
    EXPは付けない。最後まで読んだものだけ st.epRead に残し、「NEW」と赤い点を消す。
    id は既読の記録に使うので、あとから変えない（題や中身は自由に直してよい）。
+   bg にその話の絵のパスを書くと、読む画面の背景になる（例：bg: "chara/ep-suki.jpg"）。省くとホームと同じ絵。
 
    steps は上から順に進む。1つは次のどれか。
      { say: "セリフ", face: "表情のメモ" }   セラが話す。face は省いてよい。書くとセリフの下に小さく出る。
@@ -1268,24 +1269,29 @@ $("#epList").addEventListener("click", e => {
   const b = e.target.closest("[data-ep]"); if (b) openEp(b.dataset.ep);
 });
 
-/* 読む画面。epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
-   epWait は下の欄がいま何を待っているか（next＝次へ／ask＝選択肢／name＝名乗る／end＝おわり）。 */
+/* 読む画面。背景はその話の絵（無ければホームと同じ絵）、会話は下の半透明の面に下から積む。
+   epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
+   会話のいちばん下には「しっぽ」（#epTail）があり、いま待っているものをそこに出す。
+   epWait はそれが何か（next＝タップで次へ／ask＝選択肢／name＝名乗る／end＝おわり）。
+   選択肢も名前の入力も、あなたの側（右）の吹き出しとして出す。 */
 let epNow = null, epQueue = [], epWait = "", epAsk = null, epName = null;
 const epText = t => t.replace(/\{name\}/g, st.user || "貴様");
 function openEp(id) {
   const ep = epOf(id); if (!ep || !epOpen(ep)) return;
   epNow = ep; epQueue = ep.steps.slice();
   $("#epTitle").textContent = ep.title;
-  $("#epLog").innerHTML = "";
+  const bg = ep.bg || CHARA_IMG, img = $("#epBg");
+  img.hidden = !bg;
+  if (bg && img.getAttribute("src") !== bg) img.src = bg;
+  $("#epLog").innerHTML = '<div class="eptail" id="epTail"></div>';
   openSheet("#sheetEp");
   epStep();
 }
-function epAdd(html) {
-  const log = $("#epLog");
-  log.insertAdjacentHTML("beforeend", html);
-  log.scrollTop = log.scrollHeight;
-}
-/* 次の段を1つ話す。話したあと、すぐ後ろが選択肢ならそのまま出す */
+const epScroll = () => { const log = $("#epLog"); log.scrollTop = log.scrollHeight; };
+/* 会話を1つ足す（しっぽの手前に） */
+function epAdd(html) { $("#epTail").insertAdjacentHTML("beforebegin", html); epScroll(); }
+function epTail(html) { $("#epTail").innerHTML = html; epScroll(); }
+/* 次の段を1つ話す。話したあと、すぐ後ろが選択肢や名乗りならそのまま出す */
 function epStep() {
   const s = epQueue.shift();
   if (s && s.say != null) {
@@ -1296,24 +1302,24 @@ function epStep() {
   const nx = epQueue[0];
   if (nx && nx.ask) {
     epQueue.shift(); epAsk = nx.ask; epWait = "ask";
-    $("#epFoot").innerHTML = nx.ask.map((c, i) =>
-      '<button class="btn epchoice" data-c="' + i + '">' + esc(c.label) + "</button>").join("");
+    epTail('<div class="epopts">' + nx.ask.map((c, i) =>
+      '<button class="epopt" data-c="' + i + '">' + esc(c.label) + "</button>").join("") + "</div>");
   } else if (nx && nx.name) {
     epQueue.shift(); epName = nx.name; epWait = "name";
-    // 名前を決めてあれば、名乗るボタンが1つだけ。決めていなければ、ここで決める
-    $("#epFoot").innerHTML = st.user
-      ? '<button class="btn epchoice" data-nm="say">' + esc(epText(epName.reply || "{name}だ。")) + "</button>"
-      : '<input class="field" id="epNameIn" placeholder="あなたの名前" maxlength="20" enterkeyhint="done" autocomplete="off">' +
-        '<div class="btnrow">' +
-        (epName.none ? '<button class="btn" data-nm="none">' + esc(epName.none.label || "名乗らない。") + "</button>" : "") +
-        '<button class="btn pri" data-nm="set">名乗る</button></div>' +
-        '<div class="note">ここで決めた名前は、設定の「あなたの名前」になります。あとから変えられます。</div>';
+    // 名前を決めてあれば、名乗る吹き出しが1つだけ。決めていなければ、吹き出しの中の欄で決める
+    epTail('<div class="epopts">' + (st.user
+      ? '<button class="epopt" data-nm="say">' + esc(epText(epName.reply || "{name}だ。")) + "</button>"
+      : '<div class="epnamebox"><input id="epNameIn" placeholder="あなたの名前" maxlength="20" enterkeyhint="done" autocomplete="off" aria-label="あなたの名前">' +
+        '<button class="epsend" data-nm="set">名乗る</button></div>' +
+        (epName.none ? '<button class="epopt" data-nm="none">' + esc(epName.none.label || "名乗らない。") + "</button>" : "") +
+        '<div class="epnote">ここで決めた名前は、設定の「あなたの名前」になります。あとから変えられます。</div>') +
+      "</div>");
   } else if (nx) {
     epWait = "next";
-    $("#epFoot").innerHTML = '<button class="btn" id="epNext">次へ</button>';
+    epTail('<div class="ephint">タップで次へ</div>');
   } else {
     epWait = "end";
-    $("#epFoot").innerHTML = '<button class="btn pri" id="epEnd">おわり</button>';
+    epTail('<button class="epend" id="epEnd">おわり</button>');
   }
 }
 function epEnd() {
@@ -1321,7 +1327,10 @@ function epEnd() {
   renderEpList();
   closeSheet("#sheetEp");
 }
-$("#epFoot").addEventListener("click", e => {
+/* 押したところで受け持ちを分ける。選択肢・名乗り・おわりはそのボタンで、
+   それ以外（絵でも会話でも）を押したら次へ進む。上の×は別に受ける */
+$("#sheetEp").addEventListener("click", e => {
+  if (e.target.closest(".sidehead")) return;
   const c = e.target.closest("[data-c]");
   if (c && epWait === "ask") {
     const pick = epAsk[+c.dataset.c]; if (!pick) return;
@@ -1332,8 +1341,8 @@ $("#epFoot").addEventListener("click", e => {
   }
   const nm = e.target.closest("[data-nm]");
   if (nm && epWait === "name") { epNamed(nm.dataset.nm); return; }
-  if (e.target.closest("#epNext") && epWait === "next") epStep();
-  if (e.target.closest("#epEnd") && epWait === "end") epEnd();
+  if (e.target.closest("#epEnd") && epWait === "end") { epEnd(); return; }
+  if (epWait === "next") epStep();
 });
 /* 名乗った（say＝決めてある名前で／set＝入力欄の名前を決めて／none＝名乗らない） */
 function epNamed(how) {
@@ -1354,11 +1363,9 @@ function epNamed(how) {
   epQueue = then.concat(epQueue);
   epName = null; epStep();
 }
-$("#epFoot").addEventListener("keydown", e => {
+$("#epLog").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "epNameIn" && !e.isComposing) { e.preventDefault(); epNamed("set"); }
 });
-/* 会話のところを押しても次へ進む（選択肢とおわりは、ボタンを押したときだけ） */
-$("#epLog").addEventListener("click", () => { if (epWait === "next") epStep(); });
 $("#epClose").addEventListener("click", () => closeSheet("#sheetEp"));   // 途中で閉じたら既読にしない
 
 /* ---------- sheets ---------- */
