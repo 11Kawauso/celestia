@@ -686,7 +686,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
    画面いっぱいの別ページのあつかいなので、閉じるのは左上の×。 */
 .sheet.side{
   top:0;max-height:none;z-index:41;              /* 真ん中の窓は、この上に重ねる */
-  border-left:1px solid var(--line);
+  /* 左の縁取りは付けない（開ききると画面の左端に細い線として残るため）。すべり出るときの境目は影で出す */
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 18px);
   transform:translateX(100%);
   touch-action:pan-y;                 /* 上下は端末まかせ、横なぞりは app.js が受けもつ */
@@ -708,7 +708,9 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .dayscroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:13px}
 .dayform{flex:none;display:flex;flex-direction:column;gap:13px;
   padding-top:13px;border-top:1px solid var(--line)}
-/* エピソード。一覧の行は「読む」ボタン（題とLv）と、右端の「記憶」ボタンに分かれる */
+/* エピソード。一覧の行は「読む」ボタン（題とLv）と、右端の「記憶」ボタンに分かれる。
+   読めるようになった話は枠を金色にする（まだの話は .row.locked で薄いまま） */
+.eprow{border-color:var(--dawn)}
 .epopen{flex:1;min-width:0;text-align:left;align-self:stretch;display:flex;align-items:center}
 /* 「記憶」。一覧の右端と、読む画面の右上に置く */
 .membtn{

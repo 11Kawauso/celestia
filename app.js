@@ -1268,6 +1268,7 @@ const epNew = ep => epOpen(ep) && !st.epRead.includes(ep.id);
 const epSpeaker = () => (st.chara.level >= MAX_LV ? "セラ" : CHARA);
 
 function renderEpList() {
+  $("#epCount").textContent = EPISODES.filter(epOpen).length + " / " + EPISODES.length;
   $("#epList").innerHTML = EPISODES.slice().sort((a, b) => a.lv - b.lv).map(ep => epOpen(ep)
     ? '<div class="row eprow"><button class="epopen" data-ep="' + esc(ep.id) + '"><div class="rowbody">' +
       '<div class="rowtitle">' + esc(ep.title) + "</div>" +
