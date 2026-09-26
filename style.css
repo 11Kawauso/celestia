@@ -708,8 +708,28 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .dayscroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:13px}
 .dayform{flex:none;display:flex;flex-direction:column;gap:13px;
   padding-top:13px;border-top:1px solid var(--line)}
-/* エピソード。一覧の行はボタンなので、左寄せに戻す */
-.eprow{width:100%;text-align:left}
+/* エピソード。一覧の行は「読む」ボタン（題とLv）と、右端の「記憶」ボタンに分かれる */
+.epopen{flex:1;min-width:0;text-align:left;align-self:stretch;display:flex;align-items:center}
+/* 「記憶」。一覧の右端と、読む画面の右上に置く */
+.membtn{
+  flex:none;border-radius:99px;padding:5px 13px;font-size:12px;font-weight:700;letter-spacing:.06em;
+  color:var(--dawn);border:1px solid var(--dawn);background:color-mix(in srgb,var(--dawn) 10%,var(--bg2));
+}
+.membtn:active{transform:scale(.95)}
+.sidehead .membtn{margin-left:auto}
+/* 記憶の画面 */
+.memcount{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+.memcard{display:flex;flex-direction:column;gap:8px;padding:12px 10px;border-radius:var(--r);
+  background:var(--bg2);border:1px solid var(--line);box-shadow:var(--shadow)}
+.memcard .epsay{background:var(--bg3);box-shadow:none}
+.memopt{
+  align-self:flex-end;max-width:80%;border-radius:14px 4px 14px 14px;padding:9px 14px;font-size:14px;text-align:left;
+  color:var(--ink);background:var(--bg);border:1.5px solid var(--dawn);
+}
+.memopt.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--dusk),var(--dawn))}   /* 開いている答え */
+.memopt.locked{color:var(--ink3);border:1.5px dashed var(--line);letter-spacing:.2em}   /* まだ記憶していない答え */
+.membody{display:flex;flex-direction:column;gap:8px}
+.memnone{align-self:flex-start;font-size:12px;color:var(--ink3);padding:0 4px}
 /* 読む画面。うしろから 背景（0）→ セレスティア（1）→ 見出しを読めるようにする上の影（2）→ 中身（3）。
    背景が無いあいだは無地（画面の地の色）。
    いまのセレスティアの絵は背景ごと描いてあるので、上寄せで切る。
@@ -737,6 +757,8 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 }
 #sheetEp .sheetin{position:relative;z-index:3;height:100%}
 #sheetEp .sheettitle{text-shadow:0 1px 6px color-mix(in srgb,var(--bg) 80%,transparent)}
+#sheetEp .membtn{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);   /* 絵の上でも読めるように */
+  background:color-mix(in srgb,var(--bg2) 85%,transparent)}
 /* ×の下に縦に並ぶ「思い出す」「非表示」 */
 .eptools{display:flex;flex-direction:column;gap:8px;align-self:flex-start;margin-top:-5px}
 /* 非表示。絵のほかは全部うすれて消え、押しても反応しない（押すと app.js が戻す） */

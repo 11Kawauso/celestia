@@ -165,11 +165,17 @@ function normalize(o) {
   Object.keys(md0).forEach(k => { if (asDate(k) && moodOf(md0[k])) o.mood[k] = md0[k]; });
   o.moodAsked = asDate(o.moodAsked);   // 調子の窓を最後に自分から出した日（閉じられても、その日はもう出さない）
   o.epRead = asArr(o.epRead).filter(x => typeof x === "string");   // 最後まで読んだエピソードの id
-  // エピソードの進みぐあい。id → したことの並び（"n"・"c0"・"m"・"x"。app.js の epDo を見よ）
+  // エピソードの進みぐあい。id → したことの並び（"n"・"c0"・"m"・"x"。app.js の epApply を見よ）
   const ep0 = asObj(o.epProg); o.epProg = {};
   Object.keys(ep0).forEach(k => {
     const a = asArr(ep0[k]).filter(x => typeof x === "string" && /^(n|c\d{1,2}|m|x)$/.test(x)).slice(0, 500);
     if (a.length) o.epProg[k] = a;
+  });
+  // エピソードの記憶。id → 選んで最後まで読んだ答え（"a0:1" ＝ 0番目の選択肢の場面の1番目。epAsks を見よ）
+  const em0 = asObj(o.epMem); o.epMem = {};
+  Object.keys(em0).forEach(k => {
+    const a = asArr(em0[k]).filter(x => typeof x === "string" && /^a\d{1,3}:\d{1,2}$/.test(x));
+    if (a.length) o.epMem[k] = Array.from(new Set(a));
   });
 
   // 「今週の早起き」の報酬を受け取った週（その週の月曜の日付）
@@ -1263,78 +1269,169 @@ const epSpeaker = () => (st.chara.level >= MAX_LV ? "セラ" : CHARA);
 
 function renderEpList() {
   $("#epList").innerHTML = EPISODES.slice().sort((a, b) => a.lv - b.lv).map(ep => epOpen(ep)
-    ? '<button class="row eprow" data-ep="' + esc(ep.id) + '"><div class="rowbody">' +
+    ? '<div class="row eprow"><button class="epopen" data-ep="' + esc(ep.id) + '"><div class="rowbody">' +
       '<div class="rowtitle">' + esc(ep.title) + "</div>" +
       '<div class="chips"><span class="chip">Lv' + ep.lv + "</span>" +
-      (epNew(ep) ? '<span class="chip imp">NEW</span>' : "") + "</div></div></button>"
+      (epNew(ep) ? '<span class="chip imp">NEW</span>' : "") + "</div></div></button>" +
+      // 選択肢のある話にだけ「記憶」を出す
+      (epAsks(ep).length ? '<button class="membtn" data-mem="' + esc(ep.id) + '">記憶</button>' : "") + "</div>"
     : '<div class="row locked"><div class="rowbody"><div class="rowtitle">？？？</div>' +
       '<div class="chips"><span class="chip">Lv' + ep.lv + "で解放</span></div></div></div>"
   ).join("") || '<div class="empty">エピソードはまだありません。</div>';
 }
 $("#epList").addEventListener("click", e => {
+  const m = e.target.closest("[data-mem]"); if (m) { openMem(m.dataset.mem); return; }
   const b = e.target.closest("[data-ep]"); if (b) openEp(b.dataset.ep);
 });
 
-/* 読む画面。背景はその話の絵（無ければホームと同じ絵）、会話は下の半透明の面に下から積む。
-   epQueue はこれから話す段。選んだ選択肢の then は、この頭に差しこむ。
-   会話のいちばん下には「しっぽ」（#epTail）があり、いま待っているものをそこに出す。
-   epWait はそれが何か（next＝タップで次へ／ask＝選択肢／name＝名乗る／end＝おわり）。
-   選択肢も名前の入力も、あなたの側（右）の吹き出しとして出す。
+/* ---- 会話の芯（画面から切り離してある） ----
+   S は1回の会話の状態。q はこれから話す段（選んだ選択肢の then は、この頭に差しこむ）。
+   wait は次に何を待っているか（next＝タップで次へ／ask＝選択肢／name＝名乗る／end＝おわり）。
+   picks はこの会話で選んだ選択肢（"a0:1" ＝ 0番目の選択肢の場面で、1番目の答え。番号は epAsks を見よ）。
+   進めるたびに、画面に足すものを out に積む（{ say: 段 } か { me: あなたの言葉 }）。
+   画面を出さずに進めることもできる（記録が最後まで行っているか確かめるときなど）。
 
-   進みぐあいは話ごとに st.epProg[id] に残し、開き直したらそこまで戻す（読み直しはできない）。
+   進みぐあいは話ごとに st.epProg[id] に残し、開き直したらそこまで戻す。
    残すのはセリフではなく「何をしたか」の並び。
      "n" 次へ ／ "c0" "c1"… その番号の選択肢 ／ "m" 名乗った ／ "x" 名乗らなかった
-   開いたら頭から並びどおりに進め直す（epReplay のあいだは記録も動きもしない）。
    あとから中身を書きかえて並びが合わなくなったら、合わなくなったところから先を捨てる。 */
-let epNow = null, epQueue = [], epWait = "", epAsk = null, epName = null, epReplay = false;
 const epText = t => t.replace(/\{name\}/g, st.user || "貴様");
-function openEp(id) {
-  const ep = epOf(id); if (!ep || !epOpen(ep)) return;
-  epNow = ep; epQueue = ep.steps.slice(); epAsk = null; epName = null;
-  $("#epTitle").textContent = ep.title;
-  epPic("#epScene", ep.bg || "");
-  epPic("#epChara", ep.chara || CHARA_IMG);
-  $("#epLog").innerHTML = '<div class="eptail" id="epTail"></div>';
-  $("#sheetEp").classList.remove("bare");   // 非表示にしていても、開き直したら戻す
-  epReplay = true;
-  epStep();
-  const acts = st.epProg[ep.id] || [];
-  let n = 0;
-  while (n < acts.length && epDo(acts[n])) n++;
-  if (n < acts.length) { st.epProg[ep.id] = acts.slice(0, n); save(); }
-  epReplay = false;
-  openSheet("#sheetEp");
-  epScroll();
+function epState(ep, out) {
+  const S = { ep: ep, q: ep.steps.slice(), wait: "", ask: null, name: null, picks: [] };
+  epAdv(S, out);
+  return S;
+}
+/* 次の段を1つ話す。話したあと、すぐ後ろが選択肢や名乗りならそのまま待ちに入る */
+function epAdv(S, out) {
+  const s = S.q.shift();
+  if (s && s.say != null) out.push({ say: s });
+  else if (s && (s.ask || s.name)) S.q.unshift(s);   // 頭がいきなり選択肢や名乗りのとき
+  const nx = S.q[0];
+  if (nx && nx.ask) { S.q.shift(); S.ask = nx.ask; S.wait = "ask"; }
+  else if (nx && nx.name) { S.q.shift(); S.name = nx.name; S.wait = "name"; }
+  else S.wait = nx ? "next" : "end";
 }
 /* 1つ進める。いまの待ちに合わない操作なら何もせず false */
-function epDo(a) {
+function epApply(S, a, out) {
   if (a === "n") {
-    if (epWait !== "next") return false;
-    epRec(a); epStep(); return true;
+    if (S.wait !== "next") return false;
+    epAdv(S, out); return true;
   }
   if (/^c\d+$/.test(a)) {
-    const pick = epWait === "ask" && epAsk[+a.slice(1)];
+    const i = +a.slice(1), pick = S.wait === "ask" && S.ask[i];
     if (!pick) return false;
-    epRec(a);
-    epAdd('<div class="epme">' + esc(pick.label) + "</div>");
-    epQueue = (pick.then || []).concat(epQueue);
-    epAsk = null; epStep(); return true;
+    S.picks.push(epAskKey(S.ep, S.ask) + ":" + i);
+    out.push({ me: pick.label });
+    S.q = (pick.then || []).concat(S.q);
+    S.ask = null; epAdv(S, out); return true;
   }
   if (a === "m" || a === "x") {
-    const nm = epWait === "name" && epName;
+    const nm = S.wait === "name" && S.name;
     if (!nm || (a === "x" && !nm.none)) return false;
-    epRec(a);
-    epAdd('<div class="epme">' + esc(a === "x" ? nm.none.label || "名乗らない。" : epText(nm.reply || "{name}だ。")) + "</div>");
-    epQueue = ((a === "x" ? nm.none.then : nm.then) || []).concat(epQueue);
-    epName = null; epStep(); return true;
+    out.push({ me: a === "x" ? nm.none.label || "名乗らない。" : epText(nm.reply || "{name}だ。") });
+    S.q = ((a === "x" ? nm.none.then : nm.then) || []).concat(S.q);
+    S.name = null; epAdv(S, out); return true;
   }
   return false;
 }
-/* したことを残す。進め直しのあいだは残さない */
-function epRec(a) {
-  if (epReplay || !epNow) return;
-  (st.epProg[epNow.id] || (st.epProg[epNow.id] = [])).push(a);
+/* 記録（st.epProg）どおりに頭から進める。合わなかった操作の手前までの数も返す */
+function epRun(ep, out) {
+  const S = epState(ep, out), acts = st.epProg[ep.id] || [];
+  let n = 0;
+  while (n < acts.length && epApply(S, acts[n], out)) n++;
+  return { S: S, n: n };
+}
+
+/* ---- 記憶 ----
+   選択肢の場面を、話の上から（選択肢の中の選択肢も含めて）順に数えて a0, a1… と呼ぶ。
+   答えは「場面:何番目」（"a0:1"）。選んで、その話を最後まで読んだ答えだけを st.epMem[id] に残し、
+   記憶の画面で中身を見られるようにする。まだの答えは「？？？」。
+   話の途中に選択肢を足したり消したりすると番号がずれるので、公開したあとは、なるべく後ろに足す。 */
+function epAsks(ep) {
+  if (ep._asks) return ep._asks;
+  const list = [];
+  const walk = steps => {
+    let q = null;   // その場面の直前のセリフ（記憶の画面で、問いかけとして出す）
+    steps.forEach(s => {
+      if (s.say != null) q = s;
+      else if (s.ask) { list.push({ ask: s.ask, q: q }); s.ask.forEach(o => walk(o.then || [])); }
+      else if (s.name) { walk(s.name.then || []); if (s.name.none) walk(s.name.none.then || []); }
+    });
+  };
+  walk(ep.steps);
+  list.forEach((x, i) => { x.key = "a" + i; });
+  return (ep._asks = list);
+}
+const epAskKey = (ep, ask) => { const x = epAsks(ep).find(y => y.ask === ask); return x ? x.key : "a?"; };
+/* 選んだ答えを記憶に足す。足したものがあれば true */
+function epRemember(id, picks) {
+  const m = st.epMem[id] || [];
+  let added = false;
+  picks.forEach(k => { if (!m.includes(k)) { m.push(k); added = true; } });
+  if (m.length) st.epMem[id] = m;
+  return added;
+}
+/* 最後まで来た。既読にして、この会話で選んだ答えを記憶に入れる */
+function epFinish(S) {
+  const id = S.ep.id;
+  const added = epRemember(id, S.picks);
+  if (added || !st.epRead.includes(id)) {
+    if (!st.epRead.includes(id)) st.epRead.push(id);
+    save(); render();
+  }
+}
+/* 記憶ができる前に最後まで読んでいた話のぶんを、記録から拾っておく（起動のたびに、足りないものだけ） */
+function epSyncMem() {
+  let changed = false;
+  EPISODES.forEach(ep => {
+    if (!st.epProg[ep.id]) return;
+    const r = epRun(ep, []);
+    if (r.S.wait === "end" && epRemember(ep.id, r.S.picks)) changed = true;
+  });
+  if (changed) save();
+}
+
+/* ---- 読む画面 ----
+   背景はその話の絵（無ければホームと同じ絵）、会話は下の半透明の面に下から積む。
+   会話のいちばん下には「しっぽ」（#epTail）があり、いま待っているもの（epS.wait）をそこに出す。
+   選択肢も名前の入力も、あなたの側（右）の吹き出しとして出す。 */
+let epS = null;
+function openEp(id) {
+  const ep = epOf(id); if (!ep || !epOpen(ep)) return;
+  const out = [], r = epRun(ep, out), acts = st.epProg[ep.id] || [];
+  if (r.n < acts.length) { st.epProg[ep.id] = acts.slice(0, r.n); save(); }
+  epS = r.S;
+  $("#epTitle").textContent = ep.title;
+  $("#epMem").hidden = !epAsks(ep).length;
+  epPic("#epScene", ep.bg || "");
+  epPic("#epChara", ep.chara || CHARA_IMG);
+  // 戻した会話は、ふわっと出る動きを付けずに並べる
+  $("#epLog").innerHTML = out.map(ev => epHtml(ev, true)).join("") + '<div class="eptail" id="epTail"></div>';
+  $("#sheetEp").classList.remove("bare");   // 非表示にしていても、開き直したら戻す
+  epPaintTail();
+  if (epS.wait === "end") epFinish(epS);
+  openSheet("#sheetEp");
+  epScroll();
+}
+/* 画面での一押し。進めて、記録して、足すものを出す */
+function epAct(a) {
+  if (!epS) return;
+  const out = [];
+  if (!epApply(epS, a, out)) return;
+  (st.epProg[epS.ep.id] || (st.epProg[epS.ep.id] = [])).push(a);
   save();
+  out.forEach(ev => $("#epTail").insertAdjacentHTML("beforebegin", epHtml(ev, false)));
+  epPaintTail();
+  if (epS.wait === "end") epFinish(epS);
+}
+/* 会話1つぶんの吹き出し。名前と表情のメモも吹き出しの中に入れる（絵の上に直に置くと読みにくいため） */
+function epHtml(ev, old) {
+  const o = old ? " old" : "";
+  if (ev.me != null) return '<div class="epme' + o + '">' + esc(ev.me) + "</div>";
+  const s = ev.say;
+  return '<div class="epline' + o + '"><div class="epsay"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
+    esc(epText(s.say)) +
+    (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div></div>";
 }
 /* 絵を差しかえる。パスが空なら隠す */
 function epPic(sel, src) {
@@ -1343,81 +1440,101 @@ function epPic(sel, src) {
   if (src && img.getAttribute("src") !== src) img.src = src;
 }
 const epScroll = () => { const log = $("#epLog"); log.scrollTop = log.scrollHeight; };
-/* 会話を1つ足す（しっぽの手前に）。進め直しで出すものは、ふわっと出る動きを付けない */
-function epAdd(html) {
-  const t = $("#epTail");
-  t.insertAdjacentHTML("beforebegin", html);
-  if (epReplay) t.previousElementSibling.classList.add("old");
-  epScroll();
-}
-function epTail(html) { $("#epTail").innerHTML = html; epScroll(); }
-/* 次の段を1つ話す。話したあと、すぐ後ろが選択肢や名乗りならそのまま出す */
-function epStep() {
-  const s = epQueue.shift();
-  if (s && s.say != null) {
-    // 名前と表情のメモも吹き出しの中に入れる（絵の上に直に置くと読みにくいため）
-    epAdd('<div class="epline"><div class="epsay"><div class="epwho">' + esc(epSpeaker()) + "</div>" +
-      esc(epText(s.say)) +
-      (s.face ? '<div class="epface">（' + esc(s.face.replace(/。$/, "")) + "）</div>" : "") + "</div></div>");
-  } else if (s && (s.ask || s.name)) { epQueue.unshift(s); }   // 頭がいきなり選択肢や名乗りのとき
-  const nx = epQueue[0];
-  if (nx && nx.ask) {
-    epQueue.shift(); epAsk = nx.ask; epWait = "ask";
-    epTail('<div class="epopts">' + nx.ask.map((c, i) =>
-      '<button class="epopt" data-c="' + i + '">' + esc(c.label) + "</button>").join("") + "</div>");
-  } else if (nx && nx.name) {
-    epQueue.shift(); epName = nx.name; epWait = "name";
+/* しっぽを、いま待っているものに合わせて描く */
+function epPaintTail() {
+  const S = epS, t = $("#epTail");
+  if (S.wait === "ask") {
+    t.innerHTML = '<div class="epopts">' + S.ask.map((c, i) =>
+      '<button class="epopt" data-c="' + i + '">' + esc(c.label) + "</button>").join("") + "</div>";
+  } else if (S.wait === "name") {
     // 名前を決めてあれば、名乗る吹き出しが1つだけ。決めていなければ、吹き出しの中の欄で決める
-    epTail('<div class="epopts">' + (st.user
-      ? '<button class="epopt" data-nm="say">' + esc(epText(epName.reply || "{name}だ。")) + "</button>"
+    const nm = S.name;
+    t.innerHTML = '<div class="epopts">' + (st.user
+      ? '<button class="epopt" data-nm="say">' + esc(epText(nm.reply || "{name}だ。")) + "</button>"
       : '<div class="epnamebox"><input id="epNameIn" placeholder="あなたの名前" maxlength="20" enterkeyhint="done" autocomplete="off" aria-label="あなたの名前">' +
         '<button class="epsend" data-nm="set">名乗る</button></div>' +
-        (epName.none ? '<button class="epopt" data-nm="none">' + esc(epName.none.label || "名乗らない。") + "</button>" : "") +
+        (nm.none ? '<button class="epopt" data-nm="none">' + esc(nm.none.label || "名乗らない。") + "</button>" : "") +
         '<div class="epnote">ここで決めた名前は、設定の「あなたの名前」になります。あとから変えられます。</div>') +
-      "</div>");
-  } else if (nx) {
-    epWait = "next";
-    epTail('<div class="ephint">タップで次へ</div>');
+      "</div>";
+  } else if (S.wait === "next") {
+    t.innerHTML = '<div class="ephint">タップで次へ</div>';
   } else {
-    // 最後まで来たら既読（「おわり」を押さずに閉じても）
-    epWait = "end";
-    epTail('<button class="epend" id="epEnd">おわり</button>');
-    if (epNow && !st.epRead.includes(epNow.id)) { st.epRead.push(epNow.id); save(); render(); }
+    t.innerHTML = '<button class="epend" id="epEnd">おわり</button>';
   }
+  epScroll();
 }
 function epClose() { renderEpList(); closeSheet("#sheetEp"); }
 /* 押したところで受け持ちを分ける。選択肢・名乗り・おわりはそのボタンで、
-   それ以外（絵でも会話でも）を押したら次へ進む。上の×は別に受ける */
+   それ以外（絵でも会話でも）を押したら次へ進む。上の×と記憶、左の思い出す・非表示は別に受ける */
 $("#sheetEp").addEventListener("click", e => {
-  // ×・思い出す・非表示はそれぞれで受ける（非表示を押した一押しで、すぐ戻してしまわないよう先に外す）
+  // 非表示を押した一押しで、すぐ戻してしまわないよう先に外す
   if (e.target.closest(".sidehead,.eptools")) return;
   const sh = $("#sheetEp");
   if (sh.classList.contains("bare")) { sh.classList.remove("bare"); return; }   // 非表示のときは、戻すだけで進めない
   const c = e.target.closest("[data-c]");
-  if (c) { epDo("c" + c.dataset.c); return; }
+  if (c) { epAct("c" + c.dataset.c); return; }
   const nm = e.target.closest("[data-nm]");
   if (nm) { epNamed(nm.dataset.nm); return; }
-  if (e.target.closest("#epEnd") && epWait === "end") { epClose(); return; }
-  epDo("n");
+  if (e.target.closest("#epEnd") && epS && epS.wait === "end") { epClose(); return; }
+  epAct("n");
 });
 /* 名乗った（say＝決めてある名前で／set＝入力欄の名前を決めて／none＝名乗らない） */
 function epNamed(how) {
-  if (epWait !== "name") return;
+  if (!epS || epS.wait !== "name") return;
   if (how === "set") {
     const v = $("#epNameIn").value.trim().slice(0, 20);
     if (!v) { $("#epNameIn").focus(); return; }
     st.user = v; save(); render();   // 設定の「あなたの名前」にも入る
     $("#epNameIn").blur();
   }
-  epDo(how === "none" ? "x" : "m");
+  epAct(how === "none" ? "x" : "m");
 }
 $("#epLog").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "epNameIn" && !e.isComposing) { e.preventDefault(); epNamed("set"); }
 });
 $("#epClose").addEventListener("click", epClose);   // 途中で閉じても、そこまでは残る
-/* 思い出す。残っている会話を消して、最初からもう一度話す（答えも選び直せる）。既読はそのまま */
+$("#epMem").addEventListener("click", () => { if (epS) openMem(epS.ep.id); });
+
+/* ---- 記憶の画面 ----
+   選択肢の場面ごとに、問いかけ（直前のセリフ）と答えを並べる。
+   記憶した答えは押すと開いて、その答えのあとの会話が見られる。まだの答えは「？？？」で押せない。 */
+function openMem(id) {
+  const ep = epOf(id); if (!ep || !epOpen(ep)) return;
+  const got = st.epMem[id] || [], asks = epAsks(ep);
+  const total = asks.reduce((a, x) => a + x.ask.length, 0);
+  const have = asks.reduce((a, x) => a + x.ask.filter((_, i) => got.includes(x.key + ":" + i)).length, 0);
+  $("#memTitle").textContent = "記憶｜" + ep.title;
+  $("#memCount").textContent = have + " / " + total;
+  $("#memList").innerHTML = asks.map(x =>
+    '<div class="memcard">' +
+    (x.q ? epHtml({ say: x.q }, true) : "") +
+    x.ask.map((o, i) => got.includes(x.key + ":" + i)
+      ? '<button class="memopt" aria-expanded="false">' + esc(o.label) + "</button>" +
+        '<div class="membody" hidden>' + memThen(o.then || []) + "</div>"
+      : '<div class="memopt locked">？？？</div>').join("") +
+    "</div>").join("");
+  openSheet("#sheetMem");
+}
+/* 答えのあとのセリフ。次の選択肢や名乗りが来たら、そこで止める（その先は別の場面として並んでいる） */
+function memThen(steps) {
+  let h = "";
+  for (const s of steps) {
+    if (s.say == null) break;
+    h += epHtml({ say: s }, true);
+  }
+  return h || '<div class="memnone">（ここで返事はない）</div>';
+}
+$("#memList").addEventListener("click", e => {
+  const b = e.target.closest(".memopt:not(.locked)"); if (!b) return;
+  const body = b.nextElementSibling, open = body.hidden;
+  body.hidden = !open;
+  b.classList.toggle("on", open);
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+});
+$("#memClose").addEventListener("click", () => closeSheet("#sheetMem"));
+/* 思い出す。残っている会話を消して、最初からもう一度話す（答えも選び直せる）。既読と記憶はそのまま */
 $("#epAgain").addEventListener("click", () => {
-  const ep = epNow; if (!ep) return;
+  const ep = epS && epS.ep; if (!ep) return;
   askConfirm("最初から思い出しますか", "いまの会話は消えて、最初からもう一度話します。答えも選び直せます。", () => {
     delete st.epProg[ep.id]; save();
     openEp(ep.id);
@@ -2539,6 +2656,7 @@ renderRem();
 mirror();
 paintNotify();
 syncNow();
+epSyncMem();   // 記憶ができる前に読み終えていた話の答えを、記憶に入れておく
 updateSpeech(new Date());
 render();
 maybeAskMood(new Date());
