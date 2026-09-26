@@ -712,12 +712,24 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .eprow{width:100%;text-align:left}
 /* 読む画面。うしろから 背景（0）→ セレスティア（1）→ 見出しを読めるようにする上の影（2）→ 中身（3）。
    背景が無いあいだは無地（画面の地の色）。
-   いまのセレスティアの絵は背景ごと描いてあるので、画面いっぱいに広げて上寄せで切る。
-   背景を抜いた立ち絵に替えたら、.epchara を object-fit:contain; object-position:center bottom にする。 */
+   いまのセレスティアの絵は背景ごと描いてあるので、上寄せで切る。
+   背景を抜いた立ち絵に替えたら、.epchara を object-position:center bottom にし、下のぼかし（mask）を外す。 */
 #sheetEp{overflow:hidden;background:var(--bg);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
-.epscene,.epchara{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.epscene{z-index:0;object-position:center}
-.epchara{z-index:1;object-position:center top}
+.epscene{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;object-position:center}
+/* セレスティアは画面の高さに合わせ、横幅は絵の縦横比のぶんだけにする（幅は auto で絵の比から決まる）。
+   スマホのように縦長の画面では横がはみ出すので、画面の幅で止めて左右を切る（cover）。
+   PCのように横に広い画面では、絵全体がまんなかに出て、左右は地の色（背景の絵があればそれ）になる。 */
+.epchara{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1;
+  height:100%;width:auto;max-width:100%;object-fit:cover;object-position:center top;
+}
+/* 画面が絵（いまの絵は 3:4）より横長のときは、絵の左右の端をぼかして地の色になじませる */
+@media (min-aspect-ratio: 3/4){
+  .epchara{
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);
+  }
+}
 #sheetEp::before{
   content:"";position:absolute;left:0;right:0;top:0;z-index:2;pointer-events:none;
   height:calc(env(safe-area-inset-top) + 96px);
