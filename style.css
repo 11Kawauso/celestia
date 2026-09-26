@@ -725,6 +725,11 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 }
 #sheetEp .sheetin{position:relative;z-index:3;height:100%}
 #sheetEp .sheettitle{text-shadow:0 1px 6px color-mix(in srgb,var(--bg) 80%,transparent)}
+/* ×の下に縦に並ぶ「思い出す」「非表示」 */
+.eptools{display:flex;flex-direction:column;gap:8px;align-self:flex-start;margin-top:-5px}
+/* 非表示。絵のほかは全部うすれて消え、押しても反応しない（押すと app.js が戻す） */
+#sheetEp .sheetin,#sheetEp::before{transition:opacity .2s ease}
+#sheetEp.bare .sheetin,#sheetEp.bare::before{opacity:0;pointer-events:none}
 /* 会話の面。ごく薄い半透明で、絵がほとんどそのまま透ける。画面の下端近くに置く。
    会話が増えるほど上へ伸び、画面の半分を超えたら中が流れる。
    いちばん上の1つに margin-top:auto を付けて、会話を面の下に寄せる（増えると上へ押し出される）。

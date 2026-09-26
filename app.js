@@ -1295,6 +1295,7 @@ function openEp(id) {
   epPic("#epScene", ep.bg || "");
   epPic("#epChara", ep.chara || CHARA_IMG);
   $("#epLog").innerHTML = '<div class="eptail" id="epTail"></div>';
+  $("#sheetEp").classList.remove("bare");   // 非表示にしていても、開き直したら戻す
   epReplay = true;
   epStep();
   const acts = st.epProg[ep.id] || [];
@@ -1388,7 +1389,10 @@ function epClose() { renderEpList(); closeSheet("#sheetEp"); }
 /* 押したところで受け持ちを分ける。選択肢・名乗り・おわりはそのボタンで、
    それ以外（絵でも会話でも）を押したら次へ進む。上の×は別に受ける */
 $("#sheetEp").addEventListener("click", e => {
-  if (e.target.closest(".sidehead")) return;
+  // ×・思い出す・非表示はそれぞれで受ける（非表示を押した一押しで、すぐ戻してしまわないよう先に外す）
+  if (e.target.closest(".sidehead,.eptools")) return;
+  const sh = $("#sheetEp");
+  if (sh.classList.contains("bare")) { sh.classList.remove("bare"); return; }   // 非表示のときは、戻すだけで進めない
   const c = e.target.closest("[data-c]");
   if (c) { epDo("c" + c.dataset.c); return; }
   const nm = e.target.closest("[data-nm]");
@@ -1411,6 +1415,16 @@ $("#epLog").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "epNameIn" && !e.isComposing) { e.preventDefault(); epNamed("set"); }
 });
 $("#epClose").addEventListener("click", epClose);   // 途中で閉じても、そこまでは残る
+/* 思い出す。残っている会話を消して、最初からもう一度話す（答えも選び直せる）。既読はそのまま */
+$("#epAgain").addEventListener("click", () => {
+  const ep = epNow; if (!ep) return;
+  askConfirm("最初から思い出しますか", "いまの会話は消えて、最初からもう一度話します。答えも選び直せます。", () => {
+    delete st.epProg[ep.id]; save();
+    openEp(ep.id);
+  }, { yes: "思い出す" });
+});
+/* 非表示。セレスティアの絵（と背景）だけを残す。画面のどこかを押すと戻る（上の #sheetEp の受け持ち） */
+$("#epHide").addEventListener("click", () => $("#sheetEp").classList.add("bare"));
 
 /* ---------- sheets ---------- */
 /* 真ん中に出る窓（.sheet の side でないもの）を開いているあいだは、透明な幕で後ろを押せなくする。
