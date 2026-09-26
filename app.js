@@ -1497,7 +1497,7 @@ $("#epClose").addEventListener("click", epClose);   // 途中で閉じても、�
 $("#epMem").addEventListener("click", () => { if (epS) openMem(epS.ep.id); });
 
 /* ---- 記憶の画面 ----
-   選択肢の場面ごとに、問いかけ（直前のセリフ）と答えを並べる。
+   答えごとにカードを分け、それぞれに問いかけ（直前のセリフ）と答えを1つずつ並べる。
    記憶した答えは押すと開いて、その答えのあとの会話が見られる。まだの答えは「？？？」で押せない。 */
 function openMem(id) {
   const ep = epOf(id); if (!ep || !epOpen(ep)) return;
@@ -1506,14 +1506,15 @@ function openMem(id) {
   const have = asks.reduce((a, x) => a + x.ask.filter((_, i) => got.includes(x.key + ":" + i)).length, 0);
   $("#memTitle").textContent = "記憶｜" + ep.title;
   $("#memCount").textContent = have + " / " + total;
-  $("#memList").innerHTML = asks.map(x =>
+  // 答え1つにつきカード1枚。どのカードにも、問いかけ（直前のセリフ）を頭に置く
+  $("#memList").innerHTML = asks.map(x => x.ask.map((o, i) =>
     '<div class="memcard">' +
     (x.q ? epHtml({ say: x.q }, true) : "") +
-    x.ask.map((o, i) => got.includes(x.key + ":" + i)
+    (got.includes(x.key + ":" + i)
       ? '<button class="memopt" aria-expanded="false">' + esc(o.label) + "</button>" +
         '<div class="membody" hidden>' + memThen(o.then || []) + "</div>"
-      : '<div class="memopt locked">？？？</div>').join("") +
-    "</div>").join("");
+      : '<div class="memopt locked">？？？</div>') +
+    "</div>").join("")).join("");
   openSheet("#sheetMem");
 }
 /* 答えのあとのセリフ。次の選択肢や名乗りが来たら、そこで止める（その先は別の場面として並んでいる） */
@@ -2144,7 +2145,7 @@ const ruleText = r => r.rule === "daily" ? "毎日"
   : r.n + "日おき";
 
 function renderRem() {
-  $("#remOff").hidden = canNotify();
+  $("#remCard").hidden = !canNotify();   // 通知をオンにするまで、欄ごと出さない
   const list = st.reminders;
   $("#remList").innerHTML = list.length ? list.map(r => {
     const nx = remNext(r);
@@ -2154,7 +2155,7 @@ function renderRem() {
       '<span class="chip">' + esc(ruleText(r)) + "</span>" +
       (nx ? '<span class="chip">次は' + (nx.getMonth() + 1) + "/" + nx.getDate() + "</span>" : "") +
       "</div></div></div>";
-  }).join("") : '<div class="empty">まだありません。</div>';
+  }).join("") : "";   // 無いときは何も出さない（下の「＋ 追加」だけ）
   $("#remList").style.display = "flex";
   $("#remList").style.flexDirection = "column";
   $("#remList").style.gap = "9px";
@@ -2373,7 +2374,7 @@ const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPad は Mac を名乗る
 
 function paintNotify() {
-  if ($("#remOff")) $("#remOff").hidden = canNotify();
+  $("#remCard").hidden = !canNotify();   // くりかえし通知は、オンにしてから出す
   const tog = $("#notifyTog"), lab = $("#notifyLab"), msg = $("#notifyMsg"), test = $("#notifyTest");
   const perm = notifyOK() ? Notification.permission : "unsupported";
   const on = canNotify();
@@ -2385,11 +2386,11 @@ function paintNotify() {
   tog.disabled = !!stop;
   tog.setAttribute("aria-checked", on ? "true" : "false");
   lab.textContent = on ? "オン" : "オフ";
-  msg.textContent = stop || (on
-    ? "予定とくりかえし通知を、時間になったら知らせます。"
-    : "オンにすると、端末が一度だけ許可をたずねます。");
+  // オフのときの説明（許可をたずねること）は「？」の中に書いてある。使えない理由だけはここに出す
+  msg.textContent = stop || (on ? "予定とくりかえし通知を、時間になったら知らせます。" : "");
   test.hidden = !on;
   $("#notifyTest2").hidden = !on;
+  test.parentElement.hidden = !on;   // 試しのボタンが2つとも無いときは、並べる段ごとしまう（空いた段が余白になるため）
   paintPingLog();
 }
 $("#notifyTog").addEventListener("click", async () => {

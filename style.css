@@ -549,6 +549,7 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .btnrow>*{flex:1}
 .note{font-size:12px;color:var(--ink3);line-height:1.7}
 .note b{color:var(--ink2);font-weight:700}
+#notifyMsg:empty,#pingState:empty{display:none}   /* 通知の知らせが無いときは、行ごと詰める */
 .note.warn{color:var(--bad)}   /* 確認の窓で、取り返しのつかないことを伝えるとき */
 .msg{font-size:12px;color:var(--ok);min-height:1.2em}
 
