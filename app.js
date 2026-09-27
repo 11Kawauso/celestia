@@ -2098,10 +2098,10 @@ $("#rmItems").innerHTML = MENU.map(m => {
     ' style="left:' + x.toFixed(2) + "%;top:" + y.toFixed(2) + '%">' + icoSvg(m) + "</button>";
 }).join("");
 
-let rmMode = "", rmSel = null, rmSpinDeg = 0, rmHideT = null;   // rmMode は tap（押して開いた）か drag（長押しで開いた）
+let rmMode = "", rmSel = null, rmSpinDeg = 0, rmHideT = null, rmOpenT = null;   // rmMode は tap（押して開いた）か drag（長押しで開いた）
 function rmOpen(mode) {
   const el = $("#rmenu");
-  clearTimeout(rmHideT);
+  clearTimeout(rmHideT); clearTimeout(rmOpenT);
   el.hidden = false;
   rmPlace();
   rmMode = mode;
@@ -2109,17 +2109,19 @@ function rmOpen(mode) {
   $("#fab").setAttribute("aria-expanded", "true");
   rmSelect(curView, true);                 // 開いたときは、いまの画面をえらんだ形から
   void el.offsetWidth;                     // 置き場所を決めてから、ふわっと出す
-  el.classList.add("on");
+  el.classList.add("on", "opening");       // opening のあいだだけ、アイコンが少し遅れて出る
+  rmOpenT = setTimeout(() => el.classList.remove("opening"), 400);
 }
+/* 閉じる。うしろの受け皿（#rmVeil）は、閉じる動きが終わるまで残しておく。
+   丸の外に触れた一押しがそのまま下のボタンに届いて、押したことにならないように */
 function rmClose() {
   if (!rmMode) return;
   rmMode = "";
   const el = $("#rmenu");
-  el.classList.remove("on");
-  $("#rmVeil").hidden = true;
+  el.classList.remove("on", "opening");
   $("#fab").setAttribute("aria-expanded", "false");
-  clearTimeout(rmHideT);
-  rmHideT = setTimeout(() => { el.hidden = true; }, 200);   // style.css の .rmenu の動きより少し長く
+  clearTimeout(rmHideT); clearTimeout(rmOpenT);
+  rmHideT = setTimeout(() => { el.hidden = true; $("#rmVeil").hidden = true; }, 350);
 }
 /* 大きい丸を、右下の丸のすぐ左上に置く。丸どうしが斜め45度の向きで少しあくように。
    画面からはみ出すときは内側へ寄せる。出てくる動きは、右下の丸のところから広がる */
@@ -2161,7 +2163,8 @@ function rmItemAt(x, y) {
   return best;
 }
 
-/* 右下の丸の押しかた。短く押す＝開く／閉じる。長く押す（か、押してすぐ指を動かす）＝そのまま指でえらぶ */
+/* 右下の丸の押しかた。短く押す＝開く。長く押す（か、押してすぐ指を動かす）＝そのまま指でえらぶ。
+   開いているあいだは受け皿が上にかぶさるので、右下の丸を押すと閉じる（上の #rmVeil） */
 const RM_HOLD = 300;    // これだけ押しつづけたら、指でえらぶ形で開く
 const RM_SLOP = 12;     // 長押しになる前でも、これだけ指が動いたら指でえらぶ形にする
 let fabPress = null, rmDrag = false;
@@ -2212,7 +2215,10 @@ $("#rmItems").addEventListener("click", e => {
   rmClose();
   showView(b.dataset.v);
 });
-$("#rmVeil").addEventListener("click", rmClose);
+/* 大きい丸が出ているあいだは、丸の外（右下の丸も含む）に触れた時点で閉じる。
+   受け皿が右下の丸の上にもかぶさっているので、右下の丸を押しても、ここで閉じるだけになる */
+$("#rmVeil").addEventListener("pointerdown", e => { e.preventDefault(); rmClose(); });
+$("#rmVeil").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); });   // 閉じたあとの一押しは飲みこむ
 document.addEventListener("keydown", e => { if (e.key === "Escape") rmClose(); });
 window.addEventListener("resize", () => { if (rmMode) rmPlace(); });
 paintFab();

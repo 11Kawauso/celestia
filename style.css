@@ -593,32 +593,41 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 /* 大きい丸。開いているあいだは、うしろ一面の透明な受け皿（.rmveil）で外の一押しを受けて閉じる。
    置き場所と、広がりはじめる点（右下の丸のところ）は app.js の rmPlace が決める */
 .rmveil{position:fixed;inset:0;z-index:46}
+/* 出るときは、右下の丸のところからゆっくり広がって止まる。消えるときは少し速く縮む。
+   触れるのは丸の面（.rmface）とアイコンだけ。箱は四角なので、丸の外の四隅（右下の丸にもかかる）は
+   すり抜けて、うしろの受け皿に届く＝閉じる。消えかけのあいだは、どこも押せない */
 .rmenu{
   position:fixed;z-index:47;left:0;top:0;
-  width:min(280px,calc(100vw - 96px));aspect-ratio:1;
-  opacity:0;transform:scale(.55);
-  transition:opacity .16s ease,transform .2s cubic-bezier(.2,.9,.3,1.1);
+  width:min(220px,calc(100vw - 96px));aspect-ratio:1;
+  opacity:0;transform:scale(.7);pointer-events:none;
+  transition:opacity .18s ease,transform .22s cubic-bezier(.4,0,.6,1);
 }
-.rmenu.on{opacity:1;transform:none}
+.rmenu.on{opacity:1;transform:none;
+  transition:opacity .22s ease,transform .36s cubic-bezier(.22,1,.36,1)}
+.rmring{pointer-events:none}
+.rmenu.on .rmface,.rmenu.on .rmitem{pointer-events:auto}
 .rmring{position:absolute;inset:0;width:100%;height:100%;overflow:visible;
   filter:drop-shadow(0 10px 28px rgba(10,8,20,.32))}
 .rmface{fill:var(--bg2)}
 .rmrim{fill:none;stroke:var(--dawn);stroke-width:3.2}   /* 輪は金一色（棘と同じ色） */
 /* 棘。輪の中心（52,52）を軸にまわる。えらぶものが変わると、いちばん近い向きへまわって移る */
 .rmspin{transform-box:view-box;transform-origin:52px 52px;opacity:0;
-  transition:transform .38s cubic-bezier(.3,.9,.3,1),opacity .18s ease}
+  transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .25s ease}
 .rmspin.on{opacity:1}
 .rmspin path{fill:var(--dawn)}
-/* アイコン。置き場所（left・top）は app.js が丸の中の割合で入れる */
+/* アイコン。置き場所（left・top）は app.js が丸の中の割合で入れる。
+   丸が広がるのに少し遅れて、ふわっと出る */
 .rmitem{
-  position:absolute;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:14px;
+  position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:12px;
   display:grid;place-items:center;color:var(--ink3);
-  transition:background .15s ease,color .15s ease,transform .15s ease;
+  transition:background .2s ease,color .2s ease,transform .25s cubic-bezier(.22,1,.36,1),opacity .2s ease;
 }
-.rmitem svg{width:30px;height:30px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.rmitem.home{width:60px;height:60px;margin:-30px 0 0 -30px}
-.rmitem.home svg{width:38px;height:38px;stroke-width:2}
-.rmitem.sel{color:var(--ink);background:var(--bg3);transform:scale(1.06)}   /* えらんでいる（指の下にある）もの */
+.rmenu:not(.on) .rmitem{opacity:0;transform:scale(.8)}
+.rmenu.opening .rmitem{transition-delay:0s,0s,.05s,.05s}   /* 開いた直後だけ遅らせる（えらびかえは遅らせない。.opening は app.js が付け外す） */
+.rmitem svg{width:24px;height:24px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rmitem.home{width:48px;height:48px;margin:-24px 0 0 -24px}
+.rmitem.home svg{width:30px;height:30px;stroke-width:2}
+.rmitem.sel{color:var(--ink);background:var(--bg3);transform:scale(1.08)}   /* えらんでいる（指の下にある）もの */
 /* ---- 記録 ---- */
 .recstats{margin-top:0}
 .stat b small{font-size:11px;font-weight:500;color:var(--ink2);margin-left:2px}
