@@ -2117,6 +2117,7 @@ function rmOpen(mode) {
 function rmClose() {
   if (!rmMode) return;
   rmMode = "";
+  rmHideLabel();
   const el = $("#rmenu");
   el.classList.remove("on", "opening");
   $("#fab").setAttribute("aria-expanded", "false");
@@ -2163,6 +2164,36 @@ function rmItemAt(x, y) {
   return best;
 }
 
+/* 長押しでえらんでいるとき、指が同じアイコンの上に RM_DWELL だけとどまったら、棘の先に名前を出す。
+   指が別のものへ移ったら、いったん消して数えなおす。棘の無いホームには出さない */
+const RM_DWELL = 500;
+const RM_TIP = 60;      // 棘の先の、中心からの距離（輪の図の単位。丸の幅が 104）
+let rmHoverV = null, rmLabelT = null;
+function rmHover(v) {
+  if (v === rmHoverV) return;
+  rmHoverV = v;
+  clearTimeout(rmLabelT);
+  $("#rmLabel").classList.remove("on");
+  const m = v && menuOf(v);
+  if (m && m.a != null) rmLabelT = setTimeout(() => rmShowLabel(m), RM_DWELL);
+}
+/* 名前の札を、棘の先から外へ向けて置く。札の近い側の端が棘の先に来るように、向きに合わせてずらす。
+   画面からはみ出すときは内側へ寄せる */
+function rmShowLabel(m) {
+  const lb = $("#rmLabel"), b = $("#rmenu").getBoundingClientRect();
+  lb.textContent = m.label;
+  const t = m.a * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t), u = b.width / 104;
+  const tipX = b.left + b.width / 2 + cs * RM_TIP * u, tipY = b.top + b.height / 2 + sn * RM_TIP * u;
+  const w = lb.offsetWidth, h = lb.offsetHeight, gap = 4;
+  let x = tipX + cs * (w / 2 + gap) - w / 2, y = tipY + sn * (h / 2 + gap) - h / 2;
+  const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+  x = Math.max(8, Math.min(x, vw - w - 8));
+  y = Math.max(8, Math.min(y, vh - h - 8));
+  lb.style.left = x + "px"; lb.style.top = y + "px";
+  lb.classList.add("on");
+}
+function rmHideLabel() { clearTimeout(rmLabelT); rmHoverV = null; $("#rmLabel").classList.remove("on"); }
+
 /* 右下の丸の押しかた。短く押す＝開く。長く押す（か、押してすぐ指を動かす）＝そのまま指でえらぶ。
    開いているあいだは受け皿が上にかぶさるので、右下の丸を押すと閉じる（上の #rmVeil） */
 const RM_HOLD = 300;    // これだけ押しつづけたら、指でえらぶ形で開く
@@ -2174,7 +2205,9 @@ function rmStartDrag() {
   clearTimeout(fabPress.t); fabPress.t = null;
   rmDrag = true;
   if (rmMode) rmMode = "drag"; else rmOpen("drag");
-  rmSelect(rmItemAt(fabPress.x, fabPress.y) || curView);
+  const v = rmItemAt(fabPress.x, fabPress.y);
+  rmSelect(v || curView);
+  rmHover(v);
 }
 fab.addEventListener("pointerdown", e => {
   if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -2184,7 +2217,12 @@ fab.addEventListener("pointerdown", e => {
 fab.addEventListener("pointermove", e => {
   if (!fabPress) return;
   fabPress.x = e.clientX; fabPress.y = e.clientY;
-  if (rmDrag) { rmSelect(rmItemAt(e.clientX, e.clientY)); return; }
+  if (rmDrag) {
+    const v = rmItemAt(e.clientX, e.clientY);
+    if (v !== rmSel) rmSelect(v);          // 同じものの上で動いているあいだは、何もしない
+    rmHover(v);
+    return;
+  }
   if (Math.hypot(e.clientX - fabPress.x0, e.clientY - fabPress.y0) > RM_SLOP) rmStartDrag();
 });
 fab.addEventListener("pointerup", e => {
