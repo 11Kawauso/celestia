@@ -592,6 +592,8 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
   transition:transform .12s ease;
 }
 .fab:active{transform:scale(.94)}
+/* 設定で「左」にしたとき（app.js の applyTheme が <html data-fab> を付ける）。大きい丸は右上に出る */
+[data-fab="left"] .fab{right:auto;left:16px}
 .fabico{display:grid;place-items:center}
 .fab svg{width:23px;height:23px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .fablab{font-size:9px;line-height:1.2;color:var(--ink2);white-space:nowrap;letter-spacing:.02em}

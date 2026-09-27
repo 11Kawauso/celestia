@@ -94,6 +94,7 @@ function normalize(o) {
   const sd = asObj(o.said); o.said = {};     // 場面ごとに、最後に出した日
   Object.keys(sd).forEach(k => { if (typeof sd[k] === "string") o.said[k] = sd[k]; });
   o.theme = ["auto", "dark", "light"].indexOf(o.theme) >= 0 ? o.theme : "auto";
+  o.fabSide = o.fabSide === "left" ? "left" : "right";   // メニューの丸を置く側（右下／左下）
 
   /* ミッションは早起きの1つだけ。自分で「やった」と申告するだけのミッションは、
      押すだけでレベルが上がってしまうので置かない（昔作ったものはここで捨てる。達成の記録は残る）。
@@ -2124,13 +2125,14 @@ function rmClose() {
   clearTimeout(rmHideT); clearTimeout(rmOpenT);
   rmHideT = setTimeout(() => { el.hidden = true; $("#rmVeil").hidden = true; }, 350);
 }
-/* 大きい丸を、右下の丸のすぐ左上に置く。丸どうしが斜め45度の向きで少しあくように。
-   画面からはみ出すときは内側へ寄せる。出てくる動きは、右下の丸のところから広がる */
+/* 大きい丸を、右下の丸のすぐ左上に置く（丸を左下に置く設定のときは、右上）。丸どうしが斜め45度の向きで少しあくように。
+   画面からはみ出すときは内側へ寄せる。出てくる動きは、小さい丸のところから広がる */
 function rmPlace() {
   const el = $("#rmenu"), f = $("#fab").getBoundingClientRect();
-  const r = el.offsetWidth / 2, fr = f.width / 2;
+  const r = el.offsetWidth / 2, fr = f.width / 2, vw = document.documentElement.clientWidth;
   const fx = f.left + fr, fy = f.top + fr, off = (r + fr + 6) * Math.SQRT1_2;
-  const cx = Math.max(r + 14, fx - off), cy = Math.max(r + 40, fy - off);
+  const cx = st.fabSide === "left" ? Math.min(vw - r - 14, fx + off) : Math.max(r + 14, fx - off);
+  const cy = Math.max(r + 40, fy - off);
   el.style.left = (cx - r) + "px";
   el.style.top = (cy - r) + "px";
   el.style.transformOrigin = (fx - cx + r) + "px " + (fy - cy + r) + "px";
@@ -2550,6 +2552,9 @@ function applyTheme() {
   barDark = t === "dark";
   if (t === "auto" && window.matchMedia) barDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   paintBar();
+  // メニューの丸を置く側。見た目の設定なので、ここでいっしょに当てる（読みこみ・やりなおしのあとも通る）
+  root.setAttribute("data-fab", st.fabSide);
+  $$("#fabPills .pill").forEach(p => p.classList.toggle("on", p.dataset.s === st.fabSide));
 }
 /* iPhoneのステータスバーの色。テーマの地の色にそろえるだけで、窓を開いても変えない。
    （実機で確かめたところ、いまのiPhoneはこの meta より、上端に接した固定の部品の色を拾う。
@@ -2822,6 +2827,10 @@ async function pushOff() {
   await sbWrite("devices?owner=eq." + owner, "DELETE");
 }
 
+$("#fabPills").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if (!b) return;
+  st.fabSide = b.dataset.s === "left" ? "left" : "right"; save(); applyTheme();
+});
 $("#themePills").addEventListener("click", e => {
   const b = e.target.closest(".pill"); if (!b) return;
   st.theme = b.dataset.t; save(); applyTheme();
