@@ -1904,12 +1904,12 @@ function placePop() {
   const pop = $("#pop"), r = popFor.getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
 
-  // 上下の限界は、ヘッダーと下の段（右下の丸）の実際の位置から取る（iPhoneのノッチぶん高さが変わるため）。
+  // 上下の限界は、ヘッダーと右下の丸の実際の位置から取る（iPhoneのノッチぶん高さが変わるため）。
   const lim = {
     top: $(".top").getBoundingClientRect().bottom + 6,
-    bottom: $(".dock").getBoundingClientRect().top - 6
+    bottom: $("#fab").getBoundingClientRect().top - 6
   };
-  // ボタンがヘッダーの裏や下の段の裏へ流れていったら閉じる
+  // ボタンがヘッダーの裏や右下の丸より下へ流れていったら閉じる
   if (r.bottom < lim.top || r.top > lim.bottom) { closePop(); return; }
 
   // 幅を測る前に左端へ戻す。右寄りのままだと折り返し幅が変わって測り間違える。

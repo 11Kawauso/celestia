@@ -10,6 +10,9 @@
   /* ホームの絵の下にあける場所（セリフ3行ぶん＋上下の余白）。いちばん下まで転がしたとき、絵の終わりがセリフに隠れないように。
      セリフ枠そのものは文字に合わせた高さで、これより低いこともある。 */
   --speech-h:117px;
+  /* 右下の丸（.fab）のぶん、中身の下にあけておく場所。丸の高さ62＋下の余白10＋すき間12。
+     いちばん下まで転がした中身や、ホームのセリフが、丸にかからないように。 */
+  --fab-room:calc(env(safe-area-inset-bottom) + 84px);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -154,6 +157,7 @@ main{
   overflow-y:auto;overscroll-behavior:contain;
   scrollbar-gutter:stable both-edges;
   padding:16px;
+  padding-bottom:var(--fab-room);   /* 中身は画面の下まで届く。いちばん下まで転がしても、右下の丸にかからない */
 }
 /* ホームは全身の絵を上下に転がして見る場所なので、バーは見せない（転がすことはできる）。
    消すのは見た目だけで、場所取りは残す。消してしまうと、ほかのタブと左右の幅がずれる。 */
@@ -164,7 +168,7 @@ main.on-home .scroller::-webkit-scrollbar-thumb{background:transparent}
 
 /* ---- キャラ画像とセリフ ---- */
 /* ホームは絵とセリフだけ。レベルとミッションは右上のゲージから呼び出す。
-   セリフは下の段のすぐ上に貼り付けるので、ここに残るのは絵だけ。
+   セリフは右下の丸のすぐ上に貼り付けるので、ここに残るのは絵だけ。
    あいだが空くのは、そこを埋める絵が入るまでの姿
    （絵を大きくしたいときは .portrait の max-height を上げる）。 */
 #v-home{padding-bottom:calc(var(--speech-h) + 12px)}   /* セリフの場所をあけておく */
@@ -178,6 +182,7 @@ main:not(.on-home) .homeonly{display:none}
    何も無いところは後ろを触れるように、当たり判定は中の要素だけにする。 */
 .overlay{
   position:absolute;inset:0;padding:16px;
+  padding-bottom:var(--fab-room);   /* セリフを右下の丸より上に置く */
   overflow:hidden;scrollbar-gutter:stable both-edges;
   display:flex;flex-direction:column;
   pointer-events:none;
@@ -567,18 +572,19 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .toggle:disabled{opacity:.45}
 
 /* ---- 下の段と、大きい丸のメニュー ---- */
-/* 下の段は箱のいちばん下。画面には貼りつけていない（body の説明を見よ）。
-   中身は右下の丸だけで、地は塗らない。幅は上の .wrap とそろえ、丸はその右端に寄せる。 */
+/* 下の段は箱のいちばん下に積んだ、高さ0の段。画面には貼りつけていない（body の説明を見よ）。
+   場所は取らず、右下の丸だけをここから上へはみ出させて、中身の上に浮かべる。
+   だから中身（.scroller）は画面の下まで届く。丸に隠れないように、中身の下には --fab-room の余白をあける。
+   幅は上の .wrap とそろえ、丸はその右端に寄せる。 */
 .dock{
-  flex:none;position:relative;z-index:30;
+  flex:none;height:0;position:relative;z-index:30;
   width:100%;max-width:480px;margin:0 auto;
-  display:flex;justify-content:flex-end;
-  padding:4px 16px calc(env(safe-area-inset-bottom) + 8px);
 }
 /* 右下の丸。いま開いている画面のアイコンと、その下に名前。
    長押しして指でえらぶので、端末のスクロールや長押しのメニューには渡さない */
 .fab{
-  width:62px;height:62px;border-radius:50%;flex:none;
+  position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom) + 10px);
+  width:62px;height:62px;border-radius:50%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   background:var(--bg2);border:2px solid var(--dawn);color:var(--dawn);
   box-shadow:0 4px 16px color-mix(in srgb,var(--dawn) 28%,transparent),0 2px 8px rgba(10,8,20,.2);
