@@ -1904,12 +1904,12 @@ function placePop() {
   const pop = $("#pop"), r = popFor.getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
 
-  // 上下の限界は、ヘッダーと下タブの実際の位置から取る（iPhoneのノッチぶん高さが変わるため）。
+  // 上下の限界は、ヘッダーと下の段（右下の丸）の実際の位置から取る（iPhoneのノッチぶん高さが変わるため）。
   const lim = {
     top: $(".top").getBoundingClientRect().bottom + 6,
-    bottom: $(".nav").getBoundingClientRect().top - 6
+    bottom: $(".dock").getBoundingClientRect().top - 6
   };
-  // ボタンがヘッダーの裏や下タブの裏へ流れていったら閉じる
+  // ボタンがヘッダーの裏や下の段の裏へ流れていったら閉じる
   if (r.bottom < lim.top || r.top > lim.bottom) { closePop(); return; }
 
   // 幅を測る前に左端へ戻す。右寄りのままだと折り返し幅が変わって測り間違える。
@@ -2045,24 +2045,177 @@ calGrid.addEventListener("pointerout", e => {
 window.addEventListener("resize", placePop);
 window.addEventListener("scroll", placePop, true);
 
-/* ---------- tabs ---------- */
-$$(".tab").forEach(t => t.addEventListener("click", () => {
-  const again = t.classList.contains("on");             // いま開いているタブをもう一度押した
-  $$(".tab").forEach(x => x.classList.toggle("on", x === t));
-  $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
+/* ---------- 画面の切りかえとメニュー ---------- */
+/* 右下の丸（#fab）に、いま開いている画面のアイコンと名前を出す。
+   押すと、その左上に大きい丸のメニュー（#rmenu）が出る。まんなかがホーム、まわりに6つ。
+   長押しすると、指を離さずにすべらせて、離したところの画面へ移れる（丸の外で離したら何もしない）。
+   選んでいる（指の下にある）ものの外には、ヘイローと同じ棘が出て、輪をまわってついてくる。ホームには出さない。
+   a は輪の上の向き（度）。0 が右、90 が下（画面の座標なので時計まわり）。 */
+const MENU = [
+  { v: "home",   label: "ホーム",     a: null, ico: '<path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/>' },
+  { v: "goal",   label: "目標",       a: -90,  ico: '<path d="M6 21V4.5"/><path d="M6 4.5h11.5l-2.6 4 2.6 4H6"/>' },
+  { v: "cal",    label: "カレンダー", a: -30,  ico: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
+  { v: "set",    label: "設定",       a: 30,   ico: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"/>' },
+  { v: "notify", label: "通知",       a: 90,   ico: '<path d="M12 4a5.5 5.5 0 015.5 5.5c0 4 1.5 5.5 2 6H4.5c.5-.5 2-2 2-6A5.5 5.5 0 0112 4z"/><path d="M10 19a2 2 0 004 0"/>' },
+  { v: "rec",    label: "記録",       a: 150,  ico: '<path d="M7 4h10v5a5 5 0 01-10 0z"/><path d="M7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3"/><path d="M12 14v3.5M9.5 17.5h5l1 3h-7z"/>' },
+  { v: "memo",   label: "メモ",       a: -150, ico: '<path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/>' }
+];
+const menuOf = v => MENU.find(m => m.v === v);
+const icoSvg = m => '<svg viewBox="0 0 24 24">' + m.ico + "</svg>";
+let curView = "home";
+
+function showView(v) {
+  const again = v === curView;                          // いま開いている画面をもう一度えらんだ
+  curView = v;
+  paintFab();
+  $$(".view").forEach(x => x.classList.toggle("on", x.id === "v-" + v));
   closePop();
   $(".scroller").scrollTop = 0;                         // 転がるのはこの中なので、戻すのもここ
-  $("main").classList.toggle("on-home", t.dataset.v === "home");   // ゲージとセリフの出し入れ
+  $("main").classList.toggle("on-home", v === "home");  // ゲージとセリフの出し入れ
   closeSheets();                                        // 開きっぱなしのパネルはたたむ
-  if (t.dataset.v === "set") paintBackup();
-  if (t.dataset.v === "cal") {                          // 開くたびに今月から（前に見ていた月には戻さない）
+  if (v === "set") paintBackup();
+  if (v === "cal") {                                    // 開くたびに今月から（前に見ていた月には戻さない）
     const n = new Date();
-    // 開いたまま押しなおしたときは、今月まで流して戻す。別のタブから来たときは一瞬で合わせる
+    // 開いたままえらびなおしたときは、今月まで流して戻す。別の画面から来たときは一瞬で合わせる
     calToIdx((n.getFullYear() - calBase.getFullYear()) * 12 + n.getMonth() - calBase.getMonth(), again && !reduceMotion());
   }
-  if (t.dataset.v === "notify") { paintNotify(); renderRem(); }
-  if (t.dataset.v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
-}));
+  if (v === "notify") { paintNotify(); renderRem(); }
+  if (v === "rec") { recOff = 0; recSel = null; renderRec(); }   // 開くたびに今日の週から
+}
+function paintFab() {
+  const m = menuOf(curView);
+  $("#fabIco").innerHTML = icoSvg(m);
+  $("#fabLab").textContent = m.label;
+  $("#fab").setAttribute("aria-label", "メニュー（いまは" + m.label + "）");
+}
+
+/* 大きい丸のボタン。置き場所は丸の中の割合で決める（RM_RHO は中心からの距離。輪の半径 47 に対して） */
+const RM_RHO = 31;
+$("#rmItems").innerHTML = MENU.map(m => {
+  const r = m.a == null ? 0 : RM_RHO, t = (m.a || 0) * Math.PI / 180;
+  const x = (52 + r * Math.cos(t)) / 104 * 100, y = (52 + r * Math.sin(t)) / 104 * 100;
+  return '<button class="rmitem' + (m.a == null ? " home" : "") + '" role="menuitem" data-v="' + m.v + '" aria-label="' + m.label + '"' +
+    ' style="left:' + x.toFixed(2) + "%;top:" + y.toFixed(2) + '%">' + icoSvg(m) + "</button>";
+}).join("");
+
+let rmMode = "", rmSel = null, rmSpinDeg = 0, rmHideT = null;   // rmMode は tap（押して開いた）か drag（長押しで開いた）
+function rmOpen(mode) {
+  const el = $("#rmenu");
+  clearTimeout(rmHideT);
+  el.hidden = false;
+  rmPlace();
+  rmMode = mode;
+  $("#rmVeil").hidden = false;
+  $("#fab").setAttribute("aria-expanded", "true");
+  rmSelect(curView, true);                 // 開いたときは、いまの画面をえらんだ形から
+  void el.offsetWidth;                     // 置き場所を決めてから、ふわっと出す
+  el.classList.add("on");
+}
+function rmClose() {
+  if (!rmMode) return;
+  rmMode = "";
+  const el = $("#rmenu");
+  el.classList.remove("on");
+  $("#rmVeil").hidden = true;
+  $("#fab").setAttribute("aria-expanded", "false");
+  clearTimeout(rmHideT);
+  rmHideT = setTimeout(() => { el.hidden = true; }, 200);   // style.css の .rmenu の動きより少し長く
+}
+/* 大きい丸を、右下の丸のすぐ左上に置く。丸どうしが斜め45度の向きで少しあくように。
+   画面からはみ出すときは内側へ寄せる。出てくる動きは、右下の丸のところから広がる */
+function rmPlace() {
+  const el = $("#rmenu"), f = $("#fab").getBoundingClientRect();
+  const r = el.offsetWidth / 2, fr = f.width / 2;
+  const fx = f.left + fr, fy = f.top + fr, off = (r + fr + 6) * Math.SQRT1_2;
+  const cx = Math.max(r + 14, fx - off), cy = Math.max(r + 40, fy - off);
+  el.style.left = (cx - r) + "px";
+  el.style.top = (cy - r) + "px";
+  el.style.transformOrigin = (fx - cx + r) + "px " + (fy - cy + r) + "px";
+}
+/* えらんでいるものを変える。棘はいちばん近い向きへまわって移る（ぐるっと遠まわりしない）。
+   ホームや、何もえらんでいないときは棘をしまう。instant のときは動かさずにその場へ */
+function rmSelect(v, instant) {
+  rmSel = v;
+  $$("#rmItems .rmitem").forEach(b => b.classList.toggle("sel", b.dataset.v === v));
+  const m = v && menuOf(v), sp = $("#rmSpin");
+  if (!m || m.a == null) { sp.classList.remove("on"); return; }
+  rmSpinDeg += ((m.a - rmSpinDeg) % 360 + 540) % 360 - 180;
+  if (instant) sp.style.transition = "none";
+  sp.style.transform = "rotate(" + rmSpinDeg + "deg)";
+  sp.classList.add("on");
+  if (instant) { void sp.getBoundingClientRect(); sp.style.transition = ""; }
+}
+/* 指の下にあるもの。まんなかの円の中ならホーム、輪の少し外までならいちばん近い向きのもの、それより外は無し */
+function rmItemAt(x, y) {
+  const b = $("#rmenu").getBoundingClientRect(), r = b.width / 2;
+  const dx = x - (b.left + r), dy = y - (b.top + r), d = Math.hypot(dx, dy) / r;
+  if (d < 0.3) return "home";
+  if (d > 1.25) return null;
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  let best = null, bestD = 999;
+  MENU.forEach(m => {
+    if (m.a == null) return;
+    const g = Math.abs(((ang - m.a) % 360 + 540) % 360 - 180);
+    if (g < bestD) { bestD = g; best = m.v; }
+  });
+  return best;
+}
+
+/* 右下の丸の押しかた。短く押す＝開く／閉じる。長く押す（か、押してすぐ指を動かす）＝そのまま指でえらぶ */
+const RM_HOLD = 300;    // これだけ押しつづけたら、指でえらぶ形で開く
+const RM_SLOP = 12;     // 長押しになる前でも、これだけ指が動いたら指でえらぶ形にする
+let fabPress = null, rmDrag = false;
+const fab = $("#fab");
+function rmStartDrag() {
+  if (!fabPress) return;
+  clearTimeout(fabPress.t); fabPress.t = null;
+  rmDrag = true;
+  if (rmMode) rmMode = "drag"; else rmOpen("drag");
+  rmSelect(rmItemAt(fabPress.x, fabPress.y) || curView);
+}
+fab.addEventListener("pointerdown", e => {
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  try { fab.setPointerCapture(e.pointerId); } catch (err) {}   // 指が丸の外へ出ても、動きをこちらで受ける
+  fabPress = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t: setTimeout(rmStartDrag, RM_HOLD) };
+});
+fab.addEventListener("pointermove", e => {
+  if (!fabPress) return;
+  fabPress.x = e.clientX; fabPress.y = e.clientY;
+  if (rmDrag) { rmSelect(rmItemAt(e.clientX, e.clientY)); return; }
+  if (Math.hypot(e.clientX - fabPress.x0, e.clientY - fabPress.y0) > RM_SLOP) rmStartDrag();
+});
+fab.addEventListener("pointerup", e => {
+  if (!fabPress) return;
+  clearTimeout(fabPress.t);
+  fabPress = null;
+  if (rmDrag) {
+    rmDrag = false;
+    const v = rmItemAt(e.clientX, e.clientY);
+    rmClose();
+    if (v) showView(v);
+    return;
+  }
+  if (rmMode) rmClose(); else rmOpen("tap");
+});
+fab.addEventListener("pointercancel", () => {
+  if (!fabPress) return;
+  clearTimeout(fabPress.t);
+  fabPress = null;
+  if (rmDrag) { rmDrag = false; rmClose(); }
+});
+fab.addEventListener("contextmenu", e => e.preventDefault());   // 長押しで端末のメニューが出ないように
+// キーボード（Enter・スペース）で押したとき。指やマウスは上の pointer で受けているので、ここでは何もしない
+fab.addEventListener("click", e => { if (e.detail === 0) { if (rmMode) rmClose(); else rmOpen("tap"); } });
+/* 押して開いたときは、アイコンを押してえらぶ。外を押したら閉じる */
+$("#rmItems").addEventListener("click", e => {
+  const b = e.target.closest("[data-v]"); if (!b) return;
+  rmClose();
+  showView(b.dataset.v);
+});
+$("#rmVeil").addEventListener("click", rmClose);
+document.addEventListener("keydown", e => { if (e.key === "Escape") rmClose(); });
+window.addEventListener("resize", () => { if (rmMode) rmPlace(); });
+paintFab();
 
 /* ---------- goal editor ---------- */
 let gediting = null, gdraft = null;
