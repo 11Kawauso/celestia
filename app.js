@@ -2136,7 +2136,13 @@ function rmPlace() {
   el.style.left = (cx - r) + "px";
   el.style.top = (cy - r) + "px";
   el.style.transformOrigin = (fx - cx + r) + "px " + (fy - cy + r) + "px";
+  rmGeo = { cx: cx, cy: cy, r: r };
 }
+/* 大きい丸の、広がりきったときの中心と半径（rmPlace が決める）。
+   指の下のアイコンや棘の先は、見た目の位置ではなくこれで測る。
+   開く動きの途中は丸がまだ小さく右下の丸に寄っているので、見た目で測ると、
+   すばやくすべらせたときに指の下のアイコンを取り違える（何もえらべない）ため */
+let rmGeo = { cx: 0, cy: 0, r: 1 };
 /* えらんでいるものを変える。棘はいちばん近い向きへまわって移る（ぐるっと遠まわりしない）。
    ホームや、何もえらんでいないときは棘をしまう。instant のときは動かさずにその場へ */
 function rmSelect(v, instant) {
@@ -2152,8 +2158,7 @@ function rmSelect(v, instant) {
 }
 /* 指の下にあるもの。まんなかの円の中ならホーム、輪の少し外までならいちばん近い向きのもの、それより外は無し */
 function rmItemAt(x, y) {
-  const b = $("#rmenu").getBoundingClientRect(), r = b.width / 2;
-  const dx = x - (b.left + r), dy = y - (b.top + r), d = Math.hypot(dx, dy) / r;
+  const dx = x - rmGeo.cx, dy = y - rmGeo.cy, d = Math.hypot(dx, dy) / rmGeo.r;
   if (d < 0.3) return "home";
   if (d > 1.25) return null;
   const ang = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -2182,10 +2187,10 @@ function rmHover(v) {
 /* 名前の札を、棘の先から外へ向けて置く。札の近い側の端が棘の先に来るように、向きに合わせてずらす。
    画面からはみ出すときは内側へ寄せる */
 function rmShowLabel(m) {
-  const lb = $("#rmLabel"), b = $("#rmenu").getBoundingClientRect();
+  const lb = $("#rmLabel"), g = rmGeo;
   lb.textContent = m.label;
-  const t = m.a * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t), u = b.width / 104;
-  const tipX = b.left + b.width / 2 + cs * RM_TIP * u, tipY = b.top + b.height / 2 + sn * RM_TIP * u;
+  const t = m.a * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t), u = g.r * 2 / 104;
+  const tipX = g.cx + cs * RM_TIP * u, tipY = g.cy + sn * RM_TIP * u;
   const w = lb.offsetWidth, h = lb.offsetHeight, gap = 4;
   let x = tipX + cs * (w / 2 + gap) - w / 2, y = tipY + sn * (h / 2 + gap) - h / 2;
   const vw = document.documentElement.clientWidth, vh = window.innerHeight;
