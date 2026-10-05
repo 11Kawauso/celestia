@@ -1091,6 +1091,9 @@ let mEditing = null;
 const ICO_NOTE = '<svg viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h4"/></svg>';
 const memoOf = id => st.memo.find(x => x.id === id);
 
+/* 右端のコピー。本文をそのまま写す（本文が空ならタイトル）。LINEなどに貼って使う */
+const ICO_COPY = '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 00-1.5-1.5H6A1.5 1.5 0 004.5 6v8A1.5 1.5 0 006 15.5h2.5"/></svg>';
+const ICO_DONE = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function renderMemo() {
   const list = st.memo.slice().reverse();   // 足した順に持っているので、逆にすれば新しいものが上
   $("#memoList").innerHTML = list.length ? list.map(m =>
@@ -1098,7 +1101,24 @@ function renderMemo() {
     '<span class="mico">' + ICO_NOTE + "</span>" +
     '<div class="rowbody"><div class="rowtitle">' + esc(m.name || "名前のないメモ") + "</div>" +
     (m.body ? '<div class="mbody">' + esc(m.body) + "</div>" : "") +
-    "</div></div>").join("") : '<div class="empty">まだメモはありません。</div>';
+    "</div>" +
+    '<button class="mcopy" data-copy="' + esc(m.id) + '" aria-label="このメモをコピー">' + ICO_COPY + "</button>" +
+    "</div>").join("") : '<div class="empty">まだメモはありません。</div>';
+}
+/* 文字をクリップボードへ。使えない環境（古い端末など）では、見えない欄に入れて選んでから写す */
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = t; ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, t.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    ta.remove();
+    return ok;
+  }
 }
 
 function openMemoEdit(id) {
@@ -1112,7 +1132,19 @@ function openMemoEdit(id) {
   if (!m) setTimeout(() => $("#mmName").focus(), 60);
 }
 $("#memoAdd").addEventListener("click", () => openMemoEdit(null));
-$("#memoList").addEventListener("click", e => {
+$("#memoList").addEventListener("click", async e => {
+  const c = e.target.closest("[data-copy]");
+  if (c) {   // コピーのボタンは、メモを開かずに写すだけ
+    const m = memoOf(c.dataset.copy); if (!m) return;
+    const ok = await copyText(m.body || m.name);
+    // できたら少しのあいだ ✓ に変える。できなかったら揺らして知らせる
+    if (ok) {
+      c.innerHTML = ICO_DONE; c.classList.add("done");
+      clearTimeout(c._t);
+      c._t = setTimeout(() => { c.innerHTML = ICO_COPY; c.classList.remove("done"); }, 1400);
+    } else flash(c);
+    return;
+  }
   const r = e.target.closest(".row[data-id]"); if (r) openMemoEdit(r.dataset.id);
 });
 $("#mmCancel").addEventListener("click", () => closeSheet("#sheetMEdit"));

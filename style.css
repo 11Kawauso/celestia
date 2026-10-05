@@ -690,6 +690,15 @@ textarea.field{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,mo
 .mbody{font-size:12.5px;color:var(--ink3);margin-top:3px;overflow-wrap:anywhere;
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 #mmBody{min-height:160px;line-height:1.7;resize:vertical}
+/* メモの右端のコピー。写せたら少しのあいだ金色の ✓ になる */
+.mcopy{
+  flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+  color:var(--ink2);background:var(--bg3);border:1px solid var(--line);
+  transition:color .2s ease,border-color .2s ease,transform .12s ease;
+}
+.mcopy:active{transform:scale(.92)}
+.mcopy svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mcopy.done{color:var(--dawn);border-color:var(--dawn)}
 
 /* ---- sheet ---- */
 /* 窓を開いているあいだ、後ろを押せなくする幕。色は付けない（app.js の paintScrim を見よ）。
